@@ -1,0 +1,197 @@
+/* Panel principal */
+.docs-reviewer-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 360px;
+  height: 100vh;
+  background: white;
+  border-left: 1px solid #e0e0e0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Header del panel */
+.docs-reviewer-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9f9f9;
+}
+
+.docs-reviewer-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Botón de cerrar */
+.docs-reviewer-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.docs-reviewer-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+/* Contenido del panel */
+.docs-reviewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.docs-reviewer-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.docs-reviewer-placeholder {
+  padding: 24px 16px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Cada item de issue */
+.docs-reviewer-issue {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.docs-reviewer-issue:hover {
+  background: #f9f9f9;
+}
+
+.docs-reviewer-issue-regla {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.docs-reviewer-issue-regla::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.docs-reviewer-issue[data-regla="arcaismos"] .docs-reviewer-issue-regla::before {
+  background: #e74c3c;
+}
+
+.docs-reviewer-issue[data-regla="voz-pasiva"] .docs-reviewer-issue-regla::before {
+  background: #f39c12;
+}
+
+.docs-reviewer-issue[data-regla="queismo"] .docs-reviewer-issue-regla::before {
+  background: #f1c40f;
+}
+
+.docs-reviewer-issue-color {
+  color: #666;
+}
+
+.docs-reviewer-issue-texto {
+  font-size: 13px;
+  color: #333;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+.docs-reviewer-issue-original {
+  background: #fff3cd;
+  padding: 8px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #333;
+  margin-bottom: 8px;
+  border-left: 2px solid #f39c12;
+}
+
+.docs-reviewer-issue-sugerencia {
+  background: #d4edda;
+  padding: 8px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #155724;
+  margin-bottom: 8px;
+  border-left: 2px solid #28a745;
+}
+
+.docs-reviewer-issue-descripcion {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.docs-reviewer-issue-button {
+  background: #0078d4;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+}
+
+.docs-reviewer-issue-button:hover {
+  background: #005a9e;
+}
+
+.docs-reviewer-issue-button:active {
+  background: #004578;
+}
+
+/* Scrollbar personalizado */
+.docs-reviewer-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
