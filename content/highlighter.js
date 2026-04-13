@@ -50,13 +50,20 @@ const DocsHighlighter = {
     });
   },
 
-  aplicarHighlights(allMatches) {
+  async aplicarHighlights(allMatches) {
     this.inicializar();
     this.issues = allMatches || [];
     this.pinnedIssueId = null;
     this.hoverIssueId = null;
     this.activeIssueId = null;
     this.renderMarkers(new Map());
+
+    // Esperar a que el textRoot esté disponible
+    const textRoot = await this.waitForTextRoot();
+    if (!textRoot) {
+      console.log("[Legal Docs] aplicarHighlights: Could not find text root, will retry on mutation");
+    }
+
     this.scheduleRecalculate();
     this.observeTextRoot();
   },
@@ -90,7 +97,7 @@ const DocsHighlighter = {
     const textRoot = this.getTextRoot();
     if (!textRoot) {
       console.log(
-        "[Docs Reviewer] Highlighter: no se encontró textRoot visible",
+        "[Legal Docs] Highlighter: no se encontró textRoot visible",
       );
       this.renderMarkers(new Map());
       return;
@@ -102,7 +109,7 @@ const DocsHighlighter = {
       (rects) => rects.length > 0,
     ).length;
 
-    console.log("[Docs Reviewer] Highlighter:", {
+    console.log("[Legal Docs] Highlighter:", {
       root:
         textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
       blocks: this.getTextBlocks(textRoot).length,
@@ -167,8 +174,42 @@ const DocsHighlighter = {
     return true;
   },
 
+  waitForTextRoot(timeout = 5000) {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+
+      const check = () => {
+        const root = this.getTextRootSync();
+        if (root) {
+          console.log(`[Legal Docs] waitForTextRoot: Found after ${Date.now() - startTime}ms`);
+          resolve(root);
+          return;
+        }
+
+        if (Date.now() - startTime > timeout) {
+          console.log(`[Legal Docs] waitForTextRoot: Timeout after ${timeout}ms`);
+          resolve(null);
+          return;
+        }
+
+        setTimeout(check, 100);
+      };
+
+      check();
+    });
+  },
+
   getTextRoot() {
+    return this.getTextRootSync();
+  },
+
+  getTextRootSync() {
+    // Try to find document content, not UI elements
     const candidates = [
+      // Prioritize document stream view (actual content)
+      '.kix-appview-editor .kix-appview-edit-container',
+      '[role="main"] .kix-appview-edit-container',
+      '.kix-appview-edit-container',
       '[role="list"].docos-stream-view',
       ".docos-stream-view",
       '[role="region"][aria-label*="ocument"]',
@@ -182,10 +223,15 @@ const DocsHighlighter = {
 
     for (const selector of candidates) {
       const elements = Array.from(document.querySelectorAll(selector));
-      const element = elements.find((node) => this.hasVisibleText(node));
-      if (element) return element;
+      for (const element of elements) {
+        if (this.hasVisibleText(element)) {
+          console.log(`[Legal Docs] Found text root with selector: ${selector}`);
+          return element;
+        }
+      }
     }
 
+    console.log("[Legal Docs] No suitable text root found");
     return null;
   },
 
@@ -365,23 +411,26 @@ const DocsHighlighter = {
 
   mapIssuesToRects(textModel) {
     const issueRects = new Map();
-    let searchCursor = 0;
 
     this.issues.forEach((issue) => {
-      const explicitStart = Number.isInteger(issue.normalizedStart)
-        ? issue.normalizedStart
-        : null;
-      const explicitEnd = Number.isInteger(issue.normalizedEnd)
-        ? issue.normalizedEnd
-        : null;
-      let startIndex = explicitStart;
-      let endIndex = explicitEnd;
+      let startIndex = issue.normalizedStart;
+      let endIndex = issue.normalizedEnd;
 
-      if (
+      // Determine whether we need to run the text-based indexOf fallback.
+      // Three cases require it:
+      //   1. Explicit positions were never set (null/undefined) — already the original logic.
+      //   2. endIndex exceeds the DOM charMap — API source text (which includes
+      //      footnotes/headers/metadata) is longer than visible DOM text, so positions
+      //      from later in the document overshoot. Fall back to indexOf instead of
+      //      silently dropping the highlight.
+      const needsTextFallback =
         startIndex === null ||
+        startIndex === undefined ||
         endIndex === null ||
-        endIndex <= startIndex
-      ) {
+        endIndex === undefined ||
+        endIndex > textModel.charMap.length;
+
+      if (needsTextFallback) {
         const normalizedNeedle = this.normalizeText(issue.textoOriginal);
         if (!normalizedNeedle) {
           issue.rects = [];
@@ -390,32 +439,33 @@ const DocsHighlighter = {
           return;
         }
 
-        startIndex = textModel.normalizedLower.indexOf(
-          normalizedNeedle,
-          searchCursor,
-        );
-
-        if (startIndex === -1 && searchCursor > 0) {
-          startIndex = textModel.normalizedLower.indexOf(normalizedNeedle);
+        // Search for the needle in the normalized text.
+        // If we have an approximate startIndex from the pre-computed position (even if endIndex overflowed),
+        // search from a window around that position to find the closest match.
+        // Otherwise, search from the beginning.
+        let searchStart = 0;
+        if (Number.isInteger(startIndex) && startIndex >= 0) {
+          // We have a partial position; search in a window around it.
+          searchStart = Math.max(0, startIndex - 10);
         }
 
+        startIndex = textModel.normalizedLower.indexOf(normalizedNeedle, searchStart);
         if (startIndex === -1) {
           issue.rects = [];
           issue.isVisible = false;
           issueRects.set(issue.id, []);
           return;
         }
-
         endIndex = startIndex + normalizedNeedle.length;
       }
 
-      if (startIndex < 0 || endIndex > textModel.charMap.length) {
+      // At this point startIndex/endIndex are resolved; reject anything still negative.
+      if (startIndex < 0) {
         issue.rects = [];
         issue.isVisible = false;
         issueRects.set(issue.id, []);
         return;
       }
-      searchCursor = Math.max(searchCursor, endIndex - 1);
 
       const range = this.createRangeFromIndices(
         textModel.charMap,

@@ -50,7 +50,9 @@ const DocsPanel = {
 
     const reanalBtn = document.getElementById("docs-reviewer-reanalizar");
     if (reanalBtn) {
-      reanalBtn.addEventListener("click", () => DocsReviewer.analizarDocumento());
+      reanalBtn.addEventListener("click", () =>
+        DocsReviewer.analizarDocumento(),
+      );
     }
   },
 
@@ -80,8 +82,8 @@ const DocsPanel = {
     this.issueElements.clear();
     this.issuesContainer.innerHTML = `
       <div class="docs-reviewer-auth-error">
-        <p class="docs-reviewer-placeholder docs-reviewer-error">No se pudo obtener el texto. Verifica que autorizaste el acceso.</p>
-        <button id="docs-reviewer-auth-btn" class="docs-reviewer-auth-button">Conectar con Google</button>
+        <p class="docs-reviewer-placeholder docs-reviewer-error">Sin acceso al documento. Concede permisos de lectura y edición.</p>
+        <button id="docs-reviewer-auth-btn" class="docs-reviewer-auth-button">Conceder</button>
       </div>
     `;
 
@@ -136,7 +138,11 @@ const DocsPanel = {
 
         const originalElement = document.createElement("div");
         originalElement.className = "docs-reviewer-issue-original";
-        this.resaltarProblema(originalElement, issue.textoOriginal, issue.regla);
+        this.resaltarProblema(
+          originalElement,
+          issue.textoOriginal,
+          issue.regla,
+        );
 
         issueDiv.appendChild(reglaElement);
         issueDiv.appendChild(textoElement);

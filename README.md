@@ -98,6 +98,14 @@ window.docsReviewerRules.push(nuevaReglaRule);
 
 1. Agregar el script a `manifest.json` en `content_scripts[0].js`
 
+### Tests
+
+```bash
+npm test
+```
+
+La suite actual valida que los patrones curados de queísmo/dequeísmo compilan y que los matchers clave siguen detectando los casos esperados.
+
 ## Notas Técnicas
 
 ### Cómo funciona

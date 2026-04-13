@@ -11,7 +11,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       const result = await handler();
       sendResponse(result);
     } catch (err) {
-      console.error("[Docs Reviewer] Error en background:", err);
+      console.error("[Legal Docs] Error en background:", err);
       sendResponse(normalizeError(err));
     }
   };
@@ -33,6 +33,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         request.replacement,
         request.range,
       ),
+    );
+    return true;
+  }
+
+  if (request.type === "APPLY_BATCH_UPDATE") {
+    respond(() =>
+      handleBatchUpdate(request.docId, request.requests),
     );
     return true;
   }
@@ -65,6 +72,14 @@ async function getAuthToken({ interactive = false } = {}) {
 
     return token;
   } catch (error) {
+    // Si es un error de OAuth mal configurado, mostrar mensaje amigable
+    if (error?.message && error.message.includes("bad client")) {
+      throw createError(
+        "La aplicación está temporalmente fuera de servicio.",
+        "SERVICE_UNAVAILABLE",
+      );
+    }
+
     if (!interactive) {
       throw createError(
         "Se requiere autorización de Google antes de analizar el documento.",
@@ -86,7 +101,7 @@ async function removeCachedAuthToken(token) {
     await chrome.identity.removeCachedAuthToken({ token });
   } catch (error) {
     console.warn(
-      "[Docs Reviewer] No se pudo limpiar el token en caché:",
+      "[Legal Docs] No se pudo limpiar el token en caché:",
       error,
     );
   }
@@ -106,6 +121,15 @@ async function fetchGoogleDoc(docId, token) {
 
   if (!response.ok) {
     const body = await response.text();
+
+    // Si es un error de OAuth (bad client id, etc.), mostrar mensaje amigable
+    if (response.status === 400 && body.includes("bad client")) {
+      throw createError(
+        "La aplicación está temporalmente fuera de servicio.",
+        "SERVICE_UNAVAILABLE",
+      );
+    }
+
     throw createError(
       `Docs API error ${response.status}: ${body}`,
       "DOCS_API_ERROR",
@@ -179,6 +203,32 @@ async function handleApplyReplacement(
             },
           },
         ];
+
+  const response = await fetch(
+    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ requests }),
+    },
+  );
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw createError(
+      `Docs API error ${response.status}: ${body}`,
+      "DOCS_API_ERROR",
+    );
+  }
+
+  return { success: true };
+}
+
+async function handleBatchUpdate(docId, requests) {
+  const token = await getAuthToken({ interactive: false });
 
   const response = await fetch(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,

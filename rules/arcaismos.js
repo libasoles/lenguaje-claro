@@ -2,7 +2,7 @@ const arcaismosRule = {
   id: "arcaismos",
   nombre: "Arcaísmo innecesario",
   descripcion: "Sustituye términos obsoletos por lenguaje actual",
-  color: "#e74c3c", // Rojo
+  color: "#f1c40f", // Amarillo
 
   getWordCaseStyle(word) {
     if (!word) return "lower";

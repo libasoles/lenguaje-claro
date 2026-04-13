@@ -32,7 +32,7 @@ const DocsReader = {
               message: chrome.runtime.lastError.message,
             };
             console.error(
-              "[Docs Reviewer] Error de comunicación con background:",
+              "[Legal Docs] Error de comunicación con background:",
               chrome.runtime.lastError.message,
             );
             resolve(null);
@@ -43,7 +43,7 @@ const DocsReader = {
               code: response.errorCode || "BACKGROUND_ERROR",
               message: response.error,
             };
-            console.error("[Docs Reviewer] Error de API:", response.error);
+            console.error("[Legal Docs] Error de API:", response.error);
             resolve(null);
             return;
           }

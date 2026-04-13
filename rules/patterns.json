@@ -1,9 +1,6 @@
 {
   "version": 1,
-  "globalExclusions": [
-    "\\bsi\\s+que\\b",
-    "\\blo\\s+que\\b"
-  ],
+  "globalExclusions": ["\\bsi\\s+que\\b", "\\blo\\s+que\\b"],
   "requiere_de_que": [
     {
       "id": "darse-cuenta",
@@ -13,9 +10,7 @@
       "triggerPattern": "\\b(?:darse\\s+cuenta|(?:me|te|se|nos|os)\\s+(?:di|doy|da|daba)\\s+cuenta)\\s+que\\b",
       "suggestedPattern": "\\b(?:darse\\s+cuenta|(?:me|te|se|nos|os)\\s+(?:di|doy|da|daba)\\s+cuenta)\\s+de\\s+que\\b",
       "message": "Posible queismo",
-      "exclusions": [
-        "\\bque\\s+si\\b"
-      ]
+      "exclusions": ["\\bque\\s+si\\b"]
     },
     {
       "id": "alegrarse",
@@ -75,9 +70,17 @@
       "triggerPattern": "\\ba\\s+pesar\\s+que\\b",
       "suggestedPattern": "\\ba\\s+pesar\\s+de\\s+que\\b",
       "message": "Posible queismo",
-      "exclusions": [
-        "\\baun\\s+a\\s+pesar\\s+que\\b"
-      ]
+      "exclusions": ["\\baun\\s+a\\s+pesar\\s+que\\b"]
+    },
+    {
+      "id": "olvidarse",
+      "label": "olvidarse",
+      "type": "queismo",
+      "confidence": "media",
+      "triggerPattern": "\\b(?:olvidarse|olvidar(?:me|te|se|nos|os)|(?:me|te|se|nos|os)\\s+olvid(?:e|es|a|amos|an|aba|abas|aban|aria|arias|arian|o|aste|aron))\\s+que\\b",
+      "suggestedPattern": "\\b(?:olvidarse|olvidar(?:me|te|se|nos|os)|(?:me|te|se|nos|os)\\s+olvid(?:e|es|a|amos|an|aba|abas|aban|aria|arias|arian|o|aste|aron))\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
     }
   ],
   "nunca_de_que": [

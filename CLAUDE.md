@@ -18,6 +18,15 @@ To load the extension for development:
 3. Click "Load unpacked" and select the project directory
 4. The extension auto-initializes when you open a Google Docs document
 
+### OAuth Configuration
+
+The extension uses Google OAuth to access the Google Docs API. The OAuth client ID is stored in `manifest.json` but should be managed via a `.env` file:
+
+1. Copy `.env.example` to `.env` (if not already done)
+2. Update the `CHROME_OAUTH_CLIENT_ID` value in `.env` with your OAuth client ID from [Google Cloud Console](https://console.cloud.google.com)
+3. Update `manifest.json`'s `oauth2.client_id` field with the same value
+4. The `.env` file is git-ignored and will not be committed (see `.gitignore`)
+
 ## Architecture
 
 The extension follows a modular design with four main layers:

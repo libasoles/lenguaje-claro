@@ -17,12 +17,12 @@ const DocsReviewer = {
     const docId = DocsReader.getDocumentId();
     if (!docId) {
       console.log(
-        "[Docs Reviewer] URL no corresponde a un documento de Google Docs",
+        "[Legal Docs] URL no corresponde a un documento de Google Docs",
       );
       return;
     }
 
-    console.log("[Docs Reviewer] Iniciando para documento:", docId);
+    console.log("[Legal Docs] Iniciando para documento:", docId);
 
     await DocsPanel.inyectar();
     DocsHighlighter.inicializar();
@@ -30,7 +30,7 @@ const DocsReviewer = {
     await this.analizarDocumento({ interactive: false });
 
     this.isInitialized = true;
-    console.log("[Docs Reviewer] Inicialización completada");
+    console.log("[Legal Docs] Inicialización completada");
   },
 
   getRuleMap() {
@@ -51,6 +51,9 @@ const DocsReviewer = {
         match.inicio,
         match.fin,
       );
+
+      console.log(`[Legal Docs] Match ${match.regla}: inicio=${match.inicio}, fin=${match.fin}, normalized=${JSON.stringify(normalizedRange)}, text="${match.textoOriginal}"`);
+
       return {
         ...match,
         id: match.id || `${match.regla}-${index}`,
@@ -71,7 +74,9 @@ const DocsReviewer = {
       return { start: null, end: null };
     }
 
-    const safeEnd = Number.isInteger(end) ? Math.max(end, start + 1) : start + 1;
+    const safeEnd = Number.isInteger(end)
+      ? Math.max(end, start + 1)
+      : start + 1;
     let normalizedStart = null;
     let normalizedEnd = null;
 
@@ -96,7 +101,7 @@ const DocsReviewer = {
   async analizarDocumento(options = {}) {
     DocsPanel.mostrarCargando();
     DocsHighlighter.limpiar();
-    console.log("[Docs Reviewer] Obteniendo texto del documento...");
+    console.log("[Legal Docs] Obteniendo texto del documento...");
 
     const documento = await DocsReader.leerDocumento(options);
     const textoCompleto = documento?.text;
@@ -104,22 +109,19 @@ const DocsReviewer = {
     if (!textoCompleto) {
       const readError = DocsReader.lastReadError;
 
-      console.log("[Docs Reviewer] No se pudo obtener el texto del documento");
+      console.log("[Legal Docs] No se pudo obtener el texto del documento");
 
       if (readError?.code === "AUTH_REQUIRED") {
         DocsPanel.mostrarErrorAuth();
         return;
       }
 
-      DocsPanel.mostrarError(
-        readError?.message ||
-          "No se pudo obtener el texto del documento. Revisa la configuración de la extensión.",
-      );
+      DocsPanel.mostrarError(readError?.message || "Sin acceso al documento.");
       return;
     }
 
     console.log(
-      "[Docs Reviewer] Texto leído (" + textoCompleto.length + " chars):",
+      "[Legal Docs] Texto leído (" + textoCompleto.length + " chars):",
       textoCompleto.substring(0, 100),
     );
     this.sourceText = textoCompleto;
@@ -134,30 +136,98 @@ const DocsReviewer = {
         try {
           const matches = regla.detectar(textoCompleto);
           console.log(
-            `[Docs Reviewer] Regla ${regla.id}: ${matches.length} coincidencias`,
+            `[Legal Docs] Regla ${regla.id}: ${matches.length} coincidencias`,
           );
           collectedMatches.push(...matches);
         } catch (e) {
-          console.error(`[Docs Reviewer] Error en regla ${regla.id}:`, e);
+          console.error(`[Legal Docs] Error en regla ${regla.id}:`, e);
         }
       });
     } else {
-      console.warn("[Docs Reviewer] No hay reglas disponibles");
+      console.warn("[Legal Docs] No hay reglas disponibles");
     }
 
     this.allMatches = this.enriquecerMatches(collectedMatches).sort((a, b) => {
       if (a.inicio !== b.inicio) return a.inicio - b.inicio;
       return a.fin - b.fin;
     });
-    this.issuesById = new Map(this.allMatches.map((issue) => [issue.id, issue]));
+    this.issuesById = new Map(
+      this.allMatches.map((issue) => [issue.id, issue]),
+    );
     this.activeIssueId = null;
 
     console.log(
-      `[Docs Reviewer] Total: ${this.allMatches.length} problemas detectados`,
+      `[Legal Docs] Total: ${this.allMatches.length} problemas detectados`,
     );
 
     DocsPanel.actualizarIssues(this.allMatches);
-    DocsHighlighter.aplicarHighlights(this.allMatches);
+    await this.aplicarResaltesEnAPI();
+    await DocsHighlighter.aplicarHighlights(this.allMatches);
+  },
+
+  async aplicarResaltesEnAPI() {
+    const docId = DocsReader.getDocumentId();
+    if (!docId || !this.allMatches.length) return;
+
+    const requests = [];
+
+    this.allMatches.forEach((issue) => {
+      const apiRange = this.mapStringRangeToApiRange(
+        this.sourceSegments,
+        issue.inicio,
+        issue.fin,
+      );
+
+      if (!apiRange) return;
+
+      const bgColor = "FFF3CD"; // Amarillo — igual que el sidebar
+
+      requests.push({
+        updateTextStyle: {
+          range: apiRange,
+          textStyle: {
+            backgroundColor: {
+              color: {
+                rgbColor: this.hexToRgb(bgColor),
+              },
+            },
+          },
+          fields: "backgroundColor",
+        },
+      });
+    });
+
+    if (requests.length === 0) return;
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "APPLY_BATCH_UPDATE",
+          docId,
+          requests,
+        },
+        (response) => {
+          if (response?.success) {
+            console.log(`[Legal Docs] ${requests.length} resaltes aplicados en API`);
+          } else {
+            console.error("[Legal Docs] Error aplicando resaltes:", response?.error);
+          }
+        },
+      );
+    } catch (error) {
+      console.error("[Legal Docs] Error en aplicarResaltesEnAPI:", error);
+    }
+  },
+
+  hexToRgb(hex) {
+    const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? {
+          red: parseInt(result[1], 16) / 255,
+          green: parseInt(result[2], 16) / 255,
+          blue: parseInt(result[3], 16) / 255,
+        }
+      : { red: 1, green: 1, blue: 0.8 };
   },
 
   getIssue(issueOrId) {
@@ -226,7 +296,7 @@ const DocsReviewer = {
         (response) => {
           if (chrome.runtime.lastError) {
             console.error(
-              "[Docs Reviewer] Error al aplicar corrección:",
+              "[Legal Docs] Error al aplicar corrección:",
               chrome.runtime.lastError.message,
             );
             alert("Error al aplicar la corrección. Inténtalo de nuevo.");
@@ -243,7 +313,7 @@ const DocsReviewer = {
             return;
           }
 
-          console.error("[Docs Reviewer] Error de API:", response?.error);
+          console.error("[Legal Docs] Error de API:", response?.error);
           alert(
             "Error al aplicar la corrección: " +
               (response?.error || "desconocido"),
@@ -285,7 +355,9 @@ const DocsReviewer = {
     try {
       const documento = await DocsReader.leerDocumento({ interactive: true });
       if (!documento?.text) {
-        throw new Error("No se pudo leer el documento para deshacer el cambio.");
+        throw new Error(
+          "No se pudo leer el documento para deshacer el cambio.",
+        );
       }
 
       const replacementStart = this.findNearestOccurrence(
@@ -334,7 +406,7 @@ const DocsReviewer = {
       this.undoStack.pop();
       await this.analizarDocumento();
     } catch (error) {
-      console.error("[Docs Reviewer] Error al deshacer cambio:", error);
+      console.error("[Legal Docs] Error al deshacer cambio:", error);
       alert(error.message || "No se pudo deshacer el cambio.");
     } finally {
       this.isUndoInFlight = false;
@@ -380,7 +452,11 @@ const DocsReviewer = {
   },
 
   mapStringPositionToApiIndex(segments, position) {
-    if (!Array.isArray(segments) || !Number.isInteger(position) || position < 0) {
+    if (
+      !Array.isArray(segments) ||
+      !Number.isInteger(position) ||
+      position < 0
+    ) {
       return null;
     }
 

@@ -303,7 +303,7 @@ async function debugGoogleDocs() {
       "\n\n✨ Debug completado. Lenguaje claro debería estar cargado en la página.",
     );
     console.log(
-      "📋 Revisar la consola del navegador para logs de [Docs Reviewer]\n",
+      "📋 Revisar la consola del navegador para logs de [Legal Docs]\n",
     );
   } catch (error) {
     console.error("Error durante debugging:", error);

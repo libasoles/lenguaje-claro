@@ -2,7 +2,7 @@ const vozPasivaRule = {
   id: "voz-pasiva",
   nombre: "Voz pasiva",
   descripcion: "Reemplaza construcciones pasivas por voz activa más directa",
-  color: "#f39c12", // Naranja
+  color: "#f1c40f", // Amarillo
 
   irregularForms: {
     abierto: {
