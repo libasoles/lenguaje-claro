@@ -11,7 +11,9 @@
   z-index: 999999;
   display: flex;
   flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
 }
 
 /* Header del panel */
@@ -24,11 +26,48 @@
   background: #f9f9f9;
 }
 
+.docs-reviewer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.docs-reviewer-logo {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
 .docs-reviewer-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: #333;
+}
+
+/* Error de autenticación */
+.docs-reviewer-auth-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 24px;
+}
+
+.docs-reviewer-auth-button {
+  background: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+}
+
+.docs-reviewer-auth-button:hover {
+  background: #3367d6;
 }
 
 /* Botón de cerrar */
@@ -50,6 +89,39 @@
 .docs-reviewer-close:hover {
   background: #f0f0f0;
   color: #333;
+}
+
+/* Grupo de botones del header */
+.docs-reviewer-header-buttons {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Botón de re-analizar */
+.docs-reviewer-reanalyze {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.docs-reviewer-reanalyze:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+/* Mensaje de error */
+.docs-reviewer-error {
+  color: #c0392b !important;
 }
 
 /* Contenido del panel */
@@ -85,6 +157,11 @@
   background: #f9f9f9;
 }
 
+.docs-reviewer-issue-active {
+  background: #eef6ff;
+  box-shadow: inset 3px 0 0 #1a73e8;
+}
+
 .docs-reviewer-issue-regla {
   font-size: 12px;
   font-weight: 600;
@@ -97,7 +174,7 @@
 }
 
 .docs-reviewer-issue-regla::before {
-  content: '';
+  content: "";
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -105,11 +182,13 @@
   flex-shrink: 0;
 }
 
-.docs-reviewer-issue[data-regla="arcaismos"] .docs-reviewer-issue-regla::before {
+.docs-reviewer-issue[data-regla="arcaismos"]
+  .docs-reviewer-issue-regla::before {
   background: #e74c3c;
 }
 
-.docs-reviewer-issue[data-regla="voz-pasiva"] .docs-reviewer-issue-regla::before {
+.docs-reviewer-issue[data-regla="voz-pasiva"]
+  .docs-reviewer-issue-regla::before {
   background: #f39c12;
 }
 
@@ -132,18 +211,36 @@
   background: #fff3cd;
   padding: 8px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 12px;
   color: #333;
   margin-bottom: 8px;
   border-left: 2px solid #f39c12;
 }
 
+.docs-reviewer-inline-mark {
+  text-decoration: underline wavy;
+  text-underline-offset: 3px;
+}
+
+.docs-reviewer-issue[data-regla="arcaismos"] .docs-reviewer-inline-mark {
+  text-decoration-color: #e74c3c;
+}
+
+.docs-reviewer-issue[data-regla="voz-pasiva"] .docs-reviewer-inline-mark {
+  text-decoration-color: #f39c12;
+}
+
+.docs-reviewer-issue[data-regla="queismo"] .docs-reviewer-inline-mark {
+  text-decoration-color: #c9a300;
+  font-weight: 600;
+}
+
 .docs-reviewer-issue-sugerencia {
   background: #d4edda;
   padding: 8px;
   border-radius: 3px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   font-size: 12px;
   color: #155724;
   margin-bottom: 8px;
@@ -194,4 +291,169 @@
 
 .docs-reviewer-content::-webkit-scrollbar-thumb:hover {
   background: #999;
+}
+
+.docs-reviewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  pointer-events: none;
+}
+
+.docs-reviewer-highlight {
+  position: fixed;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.docs-reviewer-highlight::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 4px;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      var(--docs-reviewer-highlight-color) 0 42%,
+      transparent 42% 58%,
+      var(--docs-reviewer-highlight-color) 58% 100%
+    );
+  background-size: 10px 4px;
+  opacity: 0.95;
+}
+
+.docs-reviewer-highlight-active::after,
+.docs-reviewer-highlight-pinned::after {
+  height: 5px;
+  bottom: 1px;
+}
+
+.docs-reviewer-popup {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  background: #fff;
+  border: 1px solid rgba(60, 64, 67, 0.18);
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(60, 64, 67, 0.22);
+  z-index: 999999;
+  padding: 14px;
+  color: #202124;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.docs-reviewer-popup-hidden {
+  display: none;
+}
+
+.docs-reviewer-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.docs-reviewer-popup-rule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.docs-reviewer-popup-rule::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--docs-reviewer-popup-color);
+}
+
+.docs-reviewer-popup-close {
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.docs-reviewer-popup-close:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.docs-reviewer-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.docs-reviewer-popup-description {
+  color: #202124;
+  font-weight: 500;
+}
+
+.docs-reviewer-popup-original,
+.docs-reviewer-popup-suggestion {
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.docs-reviewer-popup-original {
+  background: #fff5d6;
+  border-left: 3px solid #f39c12;
+}
+
+.docs-reviewer-popup-suggestion {
+  background: #e8f5e9;
+  border-left: 3px solid #34a853;
+}
+
+.docs-reviewer-popup-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.docs-reviewer-popup-button {
+  flex: 1;
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #1f1f1f;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.docs-reviewer-popup-button:hover {
+  background: #f8f9fa;
+}
+
+.docs-reviewer-popup-button-primary {
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+
+.docs-reviewer-popup-button-primary:hover {
+  background: #1557b0;
 }

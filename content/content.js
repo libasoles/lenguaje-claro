@@ -1,117 +1,402 @@
-// Main content script - Orquesta todo el análisis y la detección de problemas
+// content.js - Orquesta el análisis usando la Google Docs API vía background service worker
+// y sincroniza panel + overlay inline.
 
 const DocsReviewer = {
   allMatches: [],
-  mutationObserver: null,
+  issuesById: new Map(),
+  activeIssueId: null,
   isInitialized: false,
+  sourceText: "",
+  sourceSegments: [],
+  undoStack: [],
+  isUndoInFlight: false,
 
-  // Inicializa la extensión
   async init() {
     if (this.isInitialized) return;
 
-    console.log('[Docs Reviewer] Iniciando...');
-
-    // Esperar a que Google Docs cargue
-    await DocsReader.esperarDocumentoListo();
-
-    console.log('[Docs Reviewer] Google Docs listo');
-
-    // Inyectar el panel
-    await DocsPanel.inyectar();
-
-    // Ejecutar análisis inicial
-    this.analizarDocumento();
-
-    // Configurar MutationObserver para re-analizar en cambios
-    this.configurarMutationObserver();
-
-    this.isInitialized = true;
-    console.log('[Docs Reviewer] Inicialización completada');
-  },
-
-  // Analiza el documento y detecta todos los problemas
-  analizarDocumento() {
-    const textoCompleto = DocsReader.leerTextoCompleto();
-
-    if (!textoCompleto) {
-      console.log('[Docs Reviewer] Documento vacío');
+    const docId = DocsReader.getDocumentId();
+    if (!docId) {
+      console.log(
+        "[Docs Reviewer] URL no corresponde a un documento de Google Docs",
+      );
       return;
     }
 
-    console.log('[Docs Reviewer] Texto leído:', textoCompleto.substring(0, 100));
-    console.log('[Docs Reviewer] Reglas disponibles:', window.docsReviewerRules ? window.docsReviewerRules.length : 0);
+    console.log("[Docs Reviewer] Iniciando para documento:", docId);
 
-    // Ejecutar todas las reglas
-    this.allMatches = [];
+    await DocsPanel.inyectar();
+    DocsHighlighter.inicializar();
+    this.inicializarUndo();
+    await this.analizarDocumento({ interactive: false });
 
-    if (window.docsReviewerRules && window.docsReviewerRules.length > 0) {
-      window.docsReviewerRules.forEach(regla => {
+    this.isInitialized = true;
+    console.log("[Docs Reviewer] Inicialización completada");
+  },
+
+  getRuleMap() {
+    const rules = window.docsReviewerRules || [];
+    return new Map(rules.map((rule) => [rule.id, rule]));
+  },
+
+  enriquecerMatches(matches) {
+    const ruleMap = this.getRuleMap();
+    const normalizedSource = DocsHighlighter.normalizeSourceTextWithMap(
+      this.sourceText,
+    );
+
+    return matches.map((match, index) => {
+      const rule = ruleMap.get(match.regla) || {};
+      const normalizedRange = this.mapMatchToNormalizedRange(
+        normalizedSource.indexMap,
+        match.inicio,
+        match.fin,
+      );
+      return {
+        ...match,
+        id: match.id || `${match.regla}-${index}`,
+        color: rule.color || "#1a73e8",
+        reglaNombre: rule.nombre || match.regla,
+        reglaDescripcion: rule.descripcion || "",
+        normalizedStart: normalizedRange.start,
+        normalizedEnd: normalizedRange.end,
+        rects: [],
+        isVisible: false,
+        isActive: false,
+      };
+    });
+  },
+
+  mapMatchToNormalizedRange(indexMap, start, end) {
+    if (!Array.isArray(indexMap) || !Number.isInteger(start) || start < 0) {
+      return { start: null, end: null };
+    }
+
+    const safeEnd = Number.isInteger(end) ? Math.max(end, start + 1) : start + 1;
+    let normalizedStart = null;
+    let normalizedEnd = null;
+
+    for (let index = start; index < safeEnd; index += 1) {
+      const normalizedIndex = indexMap[index];
+
+      if (!Number.isInteger(normalizedIndex)) continue;
+
+      if (normalizedStart === null) {
+        normalizedStart = normalizedIndex;
+      }
+
+      normalizedEnd = normalizedIndex + 1;
+    }
+
+    return {
+      start: normalizedStart,
+      end: normalizedEnd,
+    };
+  },
+
+  async analizarDocumento(options = {}) {
+    DocsPanel.mostrarCargando();
+    DocsHighlighter.limpiar();
+    console.log("[Docs Reviewer] Obteniendo texto del documento...");
+
+    const documento = await DocsReader.leerDocumento(options);
+    const textoCompleto = documento?.text;
+
+    if (!textoCompleto) {
+      const readError = DocsReader.lastReadError;
+
+      console.log("[Docs Reviewer] No se pudo obtener el texto del documento");
+
+      if (readError?.code === "AUTH_REQUIRED") {
+        DocsPanel.mostrarErrorAuth();
+        return;
+      }
+
+      DocsPanel.mostrarError(
+        readError?.message ||
+          "No se pudo obtener el texto del documento. Revisa la configuración de la extensión.",
+      );
+      return;
+    }
+
+    console.log(
+      "[Docs Reviewer] Texto leído (" + textoCompleto.length + " chars):",
+      textoCompleto.substring(0, 100),
+    );
+    this.sourceText = textoCompleto;
+    this.sourceSegments = Array.isArray(documento?.segments)
+      ? documento.segments
+      : [];
+
+    const collectedMatches = [];
+
+    if (window.docsReviewerRules?.length > 0) {
+      window.docsReviewerRules.forEach((regla) => {
         try {
-          console.log(`[Docs Reviewer] Ejecutando regla: ${regla.id}`);
           const matches = regla.detectar(textoCompleto);
-          console.log(`[Docs Reviewer] Regla ${regla.id} encontró ${matches.length} matches`);
-          this.allMatches.push(...matches);
+          console.log(
+            `[Docs Reviewer] Regla ${regla.id}: ${matches.length} coincidencias`,
+          );
+          collectedMatches.push(...matches);
         } catch (e) {
           console.error(`[Docs Reviewer] Error en regla ${regla.id}:`, e);
         }
       });
     } else {
-      console.warn('[Docs Reviewer] No hay reglas disponibles');
+      console.warn("[Docs Reviewer] No hay reglas disponibles");
     }
 
-    // Ordenar matches por posición
-    this.allMatches.sort((a, b) => a.inicio - b.inicio);
+    this.allMatches = this.enriquecerMatches(collectedMatches).sort((a, b) => {
+      if (a.inicio !== b.inicio) return a.inicio - b.inicio;
+      return a.fin - b.fin;
+    });
+    this.issuesById = new Map(this.allMatches.map((issue) => [issue.id, issue]));
+    this.activeIssueId = null;
 
-    console.log(`[Docs Reviewer] ${this.allMatches.length} problemas detectados`);
+    console.log(
+      `[Docs Reviewer] Total: ${this.allMatches.length} problemas detectados`,
+    );
 
-    // Actualizar visualización
-    DocsHighlighter.aplicarHighlights(this.allMatches);
     DocsPanel.actualizarIssues(this.allMatches);
+    DocsHighlighter.aplicarHighlights(this.allMatches);
   },
 
-  // Configura MutationObserver para detectar cambios en el documento
-  configurarMutationObserver() {
-    // Observar cambios en los párrafos
-    const target = document.querySelector('.kix-appview') || document.body;
+  getIssue(issueOrId) {
+    if (!issueOrId) return null;
+    if (typeof issueOrId === "string") {
+      return this.issuesById.get(issueOrId) || null;
+    }
+    return issueOrId;
+  },
 
-    const config = {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      characterDataOldValue: false,
-      // Limitar observación a cambios significativos
-    };
-
-    this.mutationObserver = new MutationObserver(() => {
-      // Debounce: esperar 500ms sin cambios antes de re-analizar
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(() => {
-        console.log('[Docs Reviewer] Re-analizando documento...');
-        this.analizarDocumento();
-      }, 500);
+  setIssueActivo(issueId, options = {}) {
+    this.activeIssueId = issueId;
+    this.allMatches.forEach((issue) => {
+      issue.isActive = issue.id === issueId;
     });
 
-    this.mutationObserver.observe(target, config);
+    DocsPanel.setIssueActivo(issueId, options);
+    DocsHighlighter.setIssueActivo(issueId, options);
   },
 
-  // Detiene la observación
-  stop() {
-    if (this.mutationObserver) {
-      this.mutationObserver.disconnect();
+  limpiarIssueActivo(options = {}) {
+    this.setIssueActivo(null, options);
+  },
+
+  enfocarIssue(issueOrId, options = {}) {
+    const issue = this.getIssue(issueOrId);
+    if (!issue) return false;
+
+    const focusOptions = {
+      showPopup: true,
+      pinPopup: true,
+      scrollPanel: true,
+      ...options,
+    };
+
+    this.setIssueActivo(issue.id, focusOptions);
+    return DocsHighlighter.focusIssue(issue.id, focusOptions);
+  },
+
+  aplicarCorreccion(issueOrId) {
+    const issue = this.getIssue(issueOrId);
+    if (!issue) return;
+
+    if (issue.regla === "arcaismos" && issue.sugerencia) {
+      const docId = DocsReader.getDocumentId();
+      if (!docId) return;
+
+      const apiRange = this.mapStringRangeToApiRange(
+        this.sourceSegments,
+        issue.inicio,
+        issue.fin,
+      );
+      if (!apiRange) {
+        alert("No se pudo ubicar el texto a reemplazar en Google Docs.");
+        return;
+      }
+
+      chrome.runtime.sendMessage(
+        {
+          type: "APPLY_REPLACEMENT",
+          docId,
+          original: issue.textoOriginal,
+          replacement: issue.sugerencia,
+          range: apiRange,
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "[Docs Reviewer] Error al aplicar corrección:",
+              chrome.runtime.lastError.message,
+            );
+            alert("Error al aplicar la corrección. Inténtalo de nuevo.");
+            return;
+          }
+
+          if (response?.success) {
+            this.undoStack.push({
+              originalText: issue.textoOriginal,
+              replacementText: issue.sugerencia,
+              sourceStart: issue.inicio,
+            });
+            this.analizarDocumento();
+            return;
+          }
+
+          console.error("[Docs Reviewer] Error de API:", response?.error);
+          alert(
+            "Error al aplicar la corrección: " +
+              (response?.error || "desconocido"),
+          );
+        },
+      );
+      return;
     }
-  }
+
+    this.enfocarIssue(issue.id, { showPopup: true, pinPopup: true });
+  },
+
+  inicializarUndo() {
+    document.addEventListener("keydown", (event) => {
+      const isUndoShortcut =
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "z";
+
+      if (!isUndoShortcut || !this.undoStack.length || this.isUndoInFlight) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      this.deshacerUltimoCambio();
+    });
+  },
+
+  async deshacerUltimoCambio() {
+    const lastChange = this.undoStack[this.undoStack.length - 1];
+    if (!lastChange) return;
+
+    const docId = DocsReader.getDocumentId();
+    if (!docId) return;
+
+    this.isUndoInFlight = true;
+
+    try {
+      const documento = await DocsReader.leerDocumento({ interactive: true });
+      if (!documento?.text) {
+        throw new Error("No se pudo leer el documento para deshacer el cambio.");
+      }
+
+      const replacementStart = this.findNearestOccurrence(
+        documento.text,
+        lastChange.replacementText,
+        lastChange.sourceStart,
+      );
+
+      if (replacementStart < 0) {
+        throw new Error("No se encontró el cambio aplicado para deshacerlo.");
+      }
+
+      const replacementEnd =
+        replacementStart + lastChange.replacementText.length;
+      const apiRange = this.mapStringRangeToApiRange(
+        documento.segments,
+        replacementStart,
+        replacementEnd,
+      );
+
+      if (!apiRange) {
+        throw new Error("No se pudo mapear el cambio al documento actual.");
+      }
+
+      const response = await new Promise((resolve) => {
+        chrome.runtime.sendMessage(
+          {
+            type: "APPLY_REPLACEMENT",
+            docId,
+            original: lastChange.replacementText,
+            replacement: lastChange.originalText,
+            range: apiRange,
+          },
+          resolve,
+        );
+      });
+
+      if (chrome.runtime.lastError) {
+        throw new Error(chrome.runtime.lastError.message);
+      }
+
+      if (!response?.success) {
+        throw new Error(response?.error || "No se pudo deshacer el cambio.");
+      }
+
+      this.undoStack.pop();
+      await this.analizarDocumento();
+    } catch (error) {
+      console.error("[Docs Reviewer] Error al deshacer cambio:", error);
+      alert(error.message || "No se pudo deshacer el cambio.");
+    } finally {
+      this.isUndoInFlight = false;
+    }
+  },
+
+  findNearestOccurrence(text, fragment, approximateIndex = 0) {
+    if (!text || !fragment) return -1;
+
+    let fromIndex = 0;
+    let nearestIndex = -1;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    while (fromIndex <= text.length) {
+      const foundIndex = text.indexOf(fragment, fromIndex);
+      if (foundIndex < 0) break;
+
+      const distance = Math.abs(foundIndex - approximateIndex);
+      if (distance < nearestDistance) {
+        nearestIndex = foundIndex;
+        nearestDistance = distance;
+      }
+
+      fromIndex = foundIndex + 1;
+    }
+
+    return nearestIndex;
+  },
+
+  mapStringRangeToApiRange(segments, start, end) {
+    const startIndex = this.mapStringPositionToApiIndex(segments, start);
+    const endIndex = this.mapStringPositionToApiIndex(segments, end);
+
+    if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex)) {
+      return null;
+    }
+
+    if (endIndex <= startIndex) {
+      return null;
+    }
+
+    return { startIndex, endIndex };
+  },
+
+  mapStringPositionToApiIndex(segments, position) {
+    if (!Array.isArray(segments) || !Number.isInteger(position) || position < 0) {
+      return null;
+    }
+
+    for (const segment of segments) {
+      const segmentStart = segment.strStart;
+      const segmentEnd = segment.strStart + segment.length;
+
+      if (position < segmentStart || position > segmentEnd) {
+        continue;
+      }
+
+      return segment.apiStart + (position - segmentStart);
+    }
+
+    return null;
+  },
 };
 
-// Iniciar cuando el documento esté completamente cargado
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    DocsReviewer.init();
-  });
-} else {
-  DocsReviewer.init();
-}
-
-// Limpiar al descargar
-window.addEventListener('beforeunload', () => {
-  DocsReviewer.stop();
-});
+DocsReviewer.init();

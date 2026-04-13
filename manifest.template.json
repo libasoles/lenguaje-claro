@@ -6,7 +6,7 @@
   "permissions": ["storage", "identity"],
   "host_permissions": ["https://docs.googleapis.com/*"],
   "oauth2": {
-    "client_id": "859241459252-kmb72v67hoep1i0467rvg52tae3o6e1p.apps.googleusercontent.com",
+    "client_id": "__GOOGLE_CLIENT_ID__",
     "scopes": ["https://www.googleapis.com/auth/documents"]
   },
   "background": {
@@ -18,24 +18,15 @@
     "48": "assets/icons/icon-48.png",
     "128": "assets/icons/icon-128.png"
   },
-  "web_accessible_resources": [
-    {
-      "resources": ["assets/icons/*", "rules/patterns.json"],
-      "matches": ["https://docs.google.com/*"]
-    }
-  ],
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/*"],
       "js": [
-        "vendor/compromise.min.js",
-        "vendor/es-compromise.min.js",
         "rules/index.js",
         "rules/arcaismos.js",
         "rules/voz-pasiva.js",
         "rules/queismo.js",
         "content/reader.js",
-        "content/highlighter.js",
         "content/panel.js",
         "content/content.js"
       ],

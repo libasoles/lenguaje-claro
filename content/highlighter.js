@@ -1,136 +1,777 @@
 const DocsHighlighter = {
-  highlights: new Map(), // Almacena referencias a los elementos de highlight
+  overlayElement: null,
+  popupElement: null,
+  issues: [],
+  issueMarkers: new Map(),
+  currentRects: new Map(),
+  activeIssueId: null,
+  pinnedIssueId: null,
+  hoverIssueId: null,
+  isPopupHovered: false,
+  recalcFrame: 0,
+  hidePopupTimer: null,
+  mutationObserver: null,
 
-  // Limpia todos los highlights previos
-  limpiar() {
-    document.querySelectorAll('.docs-reviewer-match').forEach(el => {
-      // Extraer el texto y reemplazar el span con un nodo de texto
-      const parent = el.parentNode;
-      const text = el.textContent;
-      const textNode = document.createTextNode(text);
-      parent.replaceChild(textNode, el);
+  inicializar() {
+    if (this.overlayElement && this.popupElement) return;
+
+    this.overlayElement = document.createElement("div");
+    this.overlayElement.id = "docs-reviewer-overlay";
+    this.overlayElement.className = "docs-reviewer-overlay";
+
+    this.popupElement = document.createElement("div");
+    this.popupElement.id = "docs-reviewer-popup";
+    this.popupElement.className =
+      "docs-reviewer-popup docs-reviewer-popup-hidden";
+    this.popupElement.addEventListener("mouseenter", () => {
+      this.isPopupHovered = true;
+      this.cancelHidePopup();
     });
-    this.highlights.clear();
-  },
-
-  // Aplica highlights basados en los matches detectados
-  aplicarHighlights(allMatches) {
-    this.limpiar();
-
-    const paragrafos = DocsReader.leerParagrafos();
-
-    allMatches.forEach(match => {
-      const textoParafo = DocsReader.leerTextoCompleto();
-      let textoAcumulado = 0;
-
-      for (const para of paragrafos) {
-        const textoParrafo = para.texto;
-        const textoParrafoLen = textoParrafo.length;
-
-        // Verificar si el match está en este párrafo
-        if (match.inicio >= textoAcumulado && match.inicio < textoAcumulado + textoParrafoLen + 1) {
-          // Calcular posición dentro del párrafo
-          const inicioEnParrafo = match.inicio - textoAcumulado;
-          const finEnParrafo = match.fin - textoAcumulado;
-
-          // Obtener la regla para el color
-          const regla = window.docsReviewerRules.find(r => r.id === match.regla);
-          const color = regla ? regla.color : '#e74c3c';
-
-          try {
-            // Crear el span con el texto del match
-            const spanMatch = document.createElement('span');
-            spanMatch.className = 'docs-reviewer-match';
-            spanMatch.textContent = match.textoOriginal;
-            spanMatch.setAttribute('data-match-id', match.id);
-            spanMatch.setAttribute('data-regla', match.regla);
-            spanMatch.setAttribute('data-sugerencia', match.sugerencia);
-            spanMatch.setAttribute('data-descripcion', match.descripcion);
-            spanMatch.style.borderBottom = `3px wavy ${color}`;
-            spanMatch.style.cursor = 'pointer';
-
-            // Usar Range API para seleccionar exactamente el rango del match
-            const range = document.createRange();
-            const nodeIterator = document.createNodeIterator(
-              para.elemento,
-              NodeFilter.SHOW_TEXT,
-              null
-            );
-
-            let currentNode;
-            let currentPos = 0;
-            let startNode = null;
-            let startOffset = 0;
-            let endNode = null;
-            let endOffset = 0;
-
-            while (currentNode = nodeIterator.nextNode()) {
-              const nodeLen = currentNode.length;
-              const nodeStart = currentPos;
-              const nodeEnd = currentPos + nodeLen;
-
-              if (!startNode && nodeEnd > inicioEnParrafo) {
-                startNode = currentNode;
-                startOffset = inicioEnParrafo - nodeStart;
-              }
-
-              if (nodeStart < finEnParrafo) {
-                endNode = currentNode;
-                endOffset = Math.min(finEnParrafo - nodeStart, nodeLen);
-              }
-
-              currentPos += nodeLen;
-            }
-
-            if (startNode && endNode) {
-              range.setStart(startNode, startOffset);
-              range.setEnd(endNode, endOffset);
-
-              // Envolver el rango con el span
-              try {
-                range.surroundContents(spanMatch);
-              } catch (e) {
-                // Si surroundContents falla (rango cruza límites de elemento),
-                // usar un enfoque alternativo
-                const contents = range.extractContents();
-                spanMatch.appendChild(contents);
-                range.insertNode(spanMatch);
-              }
-
-              this.highlights.set(match.id, spanMatch);
-            }
-          } catch (e) {
-            console.error('Error al inyectar highlight:', e);
-          }
-
-          break;
-        }
-
-        textoAcumulado += textoParrafo.length + 1; // +1 por el newline
+    this.popupElement.addEventListener("mouseleave", (event) => {
+      this.isPopupHovered = false;
+      if (!this.pinnedIssueId) {
+        this.maybeHidePopup(event.relatedTarget);
       }
     });
 
-    // Agregar listener a los highlights para mostrar tooltips
-    this.agregarListeners();
+    document.body.appendChild(this.overlayElement);
+    document.body.appendChild(this.popupElement);
+
+    window.addEventListener("resize", () => this.scheduleRecalculate());
+    window.addEventListener("scroll", () => this.scheduleRecalculate(), true);
+    document.addEventListener("click", (event) =>
+      this.handleDocumentClick(event),
+    );
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        this.pinnedIssueId = null;
+        DocsReviewer.limpiarIssueActivo();
+      }
+    });
   },
 
-  // Agrega event listeners a los highlights
-  agregarListeners() {
-    document.querySelectorAll('.docs-reviewer-match').forEach(span => {
-      span.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Mostrar un evento personalizado que el panel puede escuchar
-        const matchId = span.textContent;
-        window.dispatchEvent(new CustomEvent('highlightClicked', { detail: { text: span.textContent } }));
+  aplicarHighlights(allMatches) {
+    this.inicializar();
+    this.issues = allMatches || [];
+    this.pinnedIssueId = null;
+    this.hoverIssueId = null;
+    this.activeIssueId = null;
+    this.renderMarkers(new Map());
+    this.scheduleRecalculate();
+    this.observeTextRoot();
+  },
+
+  limpiar() {
+    this.cancelHidePopup();
+    if (this.recalcFrame) {
+      cancelAnimationFrame(this.recalcFrame);
+      this.recalcFrame = 0;
+    }
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+
+    this.currentRects = new Map();
+    this.issueMarkers.forEach((markers) => {
+      markers.forEach((marker) => marker.remove());
+    });
+    this.issueMarkers.clear();
+    this.hidePopup();
+  },
+
+  recalcularPosiciones() {
+    if (!this.overlayElement) return;
+    if (!this.issues?.length) {
+      this.renderMarkers(new Map());
+      return;
+    }
+
+    const textRoot = this.getTextRoot();
+    if (!textRoot) {
+      console.log(
+        "[Docs Reviewer] Highlighter: no se encontró textRoot visible",
+      );
+      this.renderMarkers(new Map());
+      return;
+    }
+
+    const textModel = this.buildTextModel(textRoot);
+    const issueRects = this.mapIssuesToRects(textModel);
+    const visibleIssues = Array.from(issueRects.values()).filter(
+      (rects) => rects.length > 0,
+    ).length;
+
+    console.log("[Docs Reviewer] Highlighter:", {
+      root:
+        textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
+      blocks: this.getTextBlocks(textRoot).length,
+      modelLength: textModel.normalizedText.length,
+      issues: this.issues.length,
+      visibleIssues,
+    });
+
+    this.renderMarkers(issueRects);
+  },
+
+  scheduleRecalculate() {
+    if (this.recalcFrame) return;
+    this.recalcFrame = requestAnimationFrame(() => {
+      this.recalcFrame = 0;
+      this.recalcularPosiciones();
+    });
+  },
+
+  setIssueActivo(issueId, options = {}) {
+    this.activeIssueId = issueId;
+    this.updateMarkerClasses();
+
+    const shouldPin = Boolean(options.pinPopup && issueId);
+    if (shouldPin) {
+      this.pinnedIssueId = issueId;
+    } else if (!options.preservePinnedPopup && this.pinnedIssueId === issueId) {
+      this.pinnedIssueId = null;
+    } else if (!issueId && !options.preservePinnedPopup) {
+      this.pinnedIssueId = null;
+    }
+
+    if (!issueId) {
+      if (!this.pinnedIssueId) {
+        this.hidePopup();
+      }
+      return;
+    }
+
+    if (options.showPopup || shouldPin || this.hoverIssueId === issueId) {
+      this.showPopup(issueId);
+      return;
+    }
+
+    if (!this.pinnedIssueId) {
+      this.hidePopup();
+    }
+  },
+
+  focusIssue(issueId, options = {}) {
+    const rects = this.currentRects.get(issueId) || [];
+    if (!rects.length) {
+      return false;
+    }
+
+    this.scrollRectIntoView(rects[0]);
+    this.setIssueActivo(issueId, {
+      ...options,
+      showPopup: true,
+      pinPopup: options.pinPopup !== false,
+    });
+    return true;
+  },
+
+  getTextRoot() {
+    const candidates = [
+      '[role="list"].docos-stream-view',
+      ".docos-stream-view",
+      '[role="region"][aria-label*="ocument"]',
+      '[role="main"] [role="document"]',
+      '[role="main"] [role="textbox"]',
+      '[role="document"]',
+      '[role="textbox"]',
+      ".kix-appview-editor",
+      ".kix-appview",
+    ];
+
+    for (const selector of candidates) {
+      const elements = Array.from(document.querySelectorAll(selector));
+      const element = elements.find((node) => this.hasVisibleText(node));
+      if (element) return element;
+    }
+
+    return null;
+  },
+
+  hasVisibleText(root) {
+    if (!root) return false;
+
+    const style = window.getComputedStyle(root);
+    if (style.display === "none" || style.visibility === "hidden") {
+      return false;
+    }
+
+    if (root.getAttribute?.("aria-hidden") === "true") {
+      return false;
+    }
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        if (!node.textContent?.trim()) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+
+        const parentStyle = window.getComputedStyle(parent);
+        if (
+          parentStyle.display === "none" ||
+          parentStyle.visibility === "hidden" ||
+          parent.getAttribute("aria-hidden") === "true"
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    });
+
+    return Boolean(walker.nextNode());
+  },
+
+  observeTextRoot() {
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+
+    const textRoot = this.getTextRoot();
+    if (!textRoot) return;
+
+    this.mutationObserver = new MutationObserver(() => {
+      this.scheduleRecalculate();
+    });
+    this.mutationObserver.observe(textRoot, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+  },
+
+  buildTextModel(textRoot) {
+    const blocks = this.getTextBlocks(textRoot);
+    const entries = [];
+
+    blocks.forEach((block, index) => {
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) => {
+          if (!node.textContent) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          const parent = node.parentElement;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+
+          const style = window.getComputedStyle(parent);
+          if (
+            style.visibility === "hidden" ||
+            style.display === "none" ||
+            parent.getAttribute("aria-hidden") === "true"
+          ) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          return NodeFilter.FILTER_ACCEPT;
+        },
       });
 
-      span.addEventListener('mouseenter', (e) => {
-        span.style.opacity = '0.7';
+      let currentNode;
+      while ((currentNode = walker.nextNode())) {
+        entries.push({
+          type: "text",
+          node: currentNode,
+          text: currentNode.textContent,
+        });
+      }
+
+      if (index < blocks.length - 1) {
+        entries.push({ type: "separator", text: "\n" });
+      }
+    });
+
+    const normalizedChars = [];
+    const charMap = [];
+    let previousWasWhitespace = false;
+
+    entries.forEach((entry) => {
+      for (let offset = 0; offset < entry.text.length; offset += 1) {
+        const char = entry.text[offset];
+        const isWhitespace = /\s/.test(char);
+
+        if (isWhitespace) {
+          if (!previousWasWhitespace) {
+            normalizedChars.push(" ");
+            charMap.push(
+              entry.type === "text" ? { node: entry.node, offset } : null,
+            );
+            previousWasWhitespace = true;
+          }
+          continue;
+        }
+
+        normalizedChars.push(char);
+        charMap.push(
+          entry.type === "text" ? { node: entry.node, offset } : null,
+        );
+        previousWasWhitespace = false;
+      }
+    });
+
+    const normalizedText = normalizedChars.join("");
+    return {
+      normalizedText,
+      normalizedLower: normalizedText.toLocaleLowerCase(),
+      charMap,
+    };
+  },
+
+  normalizeSourceTextWithMap(text) {
+    const normalizedChars = [];
+    const indexMap = [];
+    let previousWasWhitespace = false;
+
+    for (let index = 0; index < (text || "").length; index += 1) {
+      const char = text[index];
+      const isWhitespace = /\s/.test(char);
+
+      if (isWhitespace) {
+        if (!previousWasWhitespace) {
+          normalizedChars.push(" ");
+          indexMap[index] = normalizedChars.length - 1;
+          previousWasWhitespace = true;
+        } else {
+          indexMap[index] = normalizedChars.length - 1;
+        }
+        continue;
+      }
+
+      normalizedChars.push(char);
+      indexMap[index] = normalizedChars.length - 1;
+      previousWasWhitespace = false;
+    }
+
+    return {
+      normalizedText: normalizedChars.join(""),
+      indexMap,
+    };
+  },
+
+  getTextBlocks(textRoot) {
+    const children = Array.from(textRoot.children || []).filter((element) =>
+      this.hasVisibleText(element),
+    );
+
+    if (children.length) return children;
+    return [textRoot];
+  },
+
+  mapIssuesToRects(textModel) {
+    const issueRects = new Map();
+    let searchCursor = 0;
+
+    this.issues.forEach((issue) => {
+      const explicitStart = Number.isInteger(issue.normalizedStart)
+        ? issue.normalizedStart
+        : null;
+      const explicitEnd = Number.isInteger(issue.normalizedEnd)
+        ? issue.normalizedEnd
+        : null;
+      let startIndex = explicitStart;
+      let endIndex = explicitEnd;
+
+      if (
+        startIndex === null ||
+        endIndex === null ||
+        endIndex <= startIndex
+      ) {
+        const normalizedNeedle = this.normalizeText(issue.textoOriginal);
+        if (!normalizedNeedle) {
+          issue.rects = [];
+          issue.isVisible = false;
+          issueRects.set(issue.id, []);
+          return;
+        }
+
+        startIndex = textModel.normalizedLower.indexOf(
+          normalizedNeedle,
+          searchCursor,
+        );
+
+        if (startIndex === -1 && searchCursor > 0) {
+          startIndex = textModel.normalizedLower.indexOf(normalizedNeedle);
+        }
+
+        if (startIndex === -1) {
+          issue.rects = [];
+          issue.isVisible = false;
+          issueRects.set(issue.id, []);
+          return;
+        }
+
+        endIndex = startIndex + normalizedNeedle.length;
+      }
+
+      if (startIndex < 0 || endIndex > textModel.charMap.length) {
+        issue.rects = [];
+        issue.isVisible = false;
+        issueRects.set(issue.id, []);
+        return;
+      }
+      searchCursor = Math.max(searchCursor, endIndex - 1);
+
+      const range = this.createRangeFromIndices(
+        textModel.charMap,
+        startIndex,
+        endIndex,
+      );
+      const rects = range
+        ? this.normalizeRects(Array.from(range.getClientRects()))
+        : [];
+
+      issue.rects = rects;
+      issue.isVisible = rects.length > 0;
+      issueRects.set(issue.id, rects);
+    });
+
+    return issueRects;
+  },
+
+  normalizeText(text) {
+    return (text || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  },
+
+  createRangeFromIndices(charMap, startIndex, endIndex) {
+    const startRef = this.findMappedChar(charMap, startIndex, 1);
+    const endRef = this.findMappedChar(charMap, endIndex - 1, -1);
+
+    if (!startRef || !endRef) return null;
+
+    const range = document.createRange();
+    range.setStart(startRef.node, startRef.offset);
+    range.setEnd(endRef.node, endRef.offset + 1);
+    return range;
+  },
+
+  findMappedChar(charMap, startIndex, direction) {
+    let index = startIndex;
+
+    while (index >= 0 && index < charMap.length) {
+      if (charMap[index]) return charMap[index];
+      index += direction;
+    }
+
+    return null;
+  },
+
+  normalizeRects(rects) {
+    return rects
+      .filter((rect) => rect.width > 2 && rect.height > 2)
+      .map((rect) => ({
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      }));
+  },
+
+  renderMarkers(issueRects) {
+    this.currentRects = issueRects;
+
+    this.issueMarkers.forEach((markers) => {
+      markers.forEach((marker) => marker.remove());
+    });
+    this.issueMarkers.clear();
+
+    if (!this.overlayElement) return;
+
+    issueRects.forEach((rects, issueId) => {
+      const issue = DocsReviewer.getIssue(issueId);
+      if (!issue || !rects.length) return;
+
+      const markers = rects.map((rect) => {
+        const marker = document.createElement("button");
+        marker.type = "button";
+        marker.className = "docs-reviewer-highlight";
+        marker.setAttribute("data-issue-id", issueId);
+        marker.setAttribute("data-regla", issue.regla);
+        marker.style.left = `${rect.left}px`;
+        marker.style.top = `${Math.max(rect.bottom - 10, rect.top)}px`;
+        marker.style.width = `${rect.width}px`;
+        marker.style.height = `${Math.max(12, Math.min(rect.height + 8, 20))}px`;
+        marker.style.setProperty(
+          "--docs-reviewer-highlight-color",
+          issue.color,
+        );
+
+        marker.addEventListener("mouseenter", () =>
+          this.handleMarkerEnter(issueId),
+        );
+        marker.addEventListener("mouseleave", (event) =>
+          this.handleMarkerLeave(issueId, event.relatedTarget),
+        );
+        marker.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.handleMarkerClick(issueId);
+        });
+
+        this.overlayElement.appendChild(marker);
+        return marker;
       });
 
-      span.addEventListener('mouseleave', (e) => {
-        span.style.opacity = '1';
+      this.issueMarkers.set(issueId, markers);
+    });
+
+    this.updateMarkerClasses();
+
+    if (this.pinnedIssueId && issueRects.get(this.pinnedIssueId)?.length) {
+      this.showPopup(this.pinnedIssueId);
+      return;
+    }
+
+    if (this.activeIssueId && issueRects.get(this.activeIssueId)?.length) {
+      this.showPopup(this.activeIssueId);
+      return;
+    }
+
+    this.hidePopup();
+  },
+
+  updateMarkerClasses() {
+    this.issueMarkers.forEach((markers, issueId) => {
+      markers.forEach((marker) => {
+        marker.classList.toggle(
+          "docs-reviewer-highlight-active",
+          issueId === this.activeIssueId,
+        );
+        marker.classList.toggle(
+          "docs-reviewer-highlight-pinned",
+          issueId === this.pinnedIssueId,
+        );
       });
     });
-  }
+  },
+
+  handleMarkerEnter(issueId) {
+    this.hoverIssueId = issueId;
+    this.cancelHidePopup();
+    DocsReviewer.setIssueActivo(issueId, { showPopup: true });
+  },
+
+  handleMarkerLeave(issueId, relatedTarget) {
+    if (this.hoverIssueId === issueId) {
+      this.hoverIssueId = null;
+    }
+
+    if (relatedTarget?.closest?.("#docs-reviewer-popup")) {
+      return;
+    }
+
+    if (!this.pinnedIssueId) {
+      this.maybeHidePopup(relatedTarget);
+    }
+  },
+
+  handleMarkerClick(issueId) {
+    this.pinnedIssueId = issueId;
+    DocsReviewer.setIssueActivo(issueId, { showPopup: true, pinPopup: true });
+  },
+
+  maybeHidePopup(relatedTarget) {
+    if (this.isPopupHovered) return;
+    if (relatedTarget?.closest?.("#docs-reviewer-popup")) return;
+    if (this.pinnedIssueId) return;
+
+    this.cancelHidePopup();
+    this.hidePopupTimer = window.setTimeout(() => {
+      if (!this.pinnedIssueId && !this.isPopupHovered) {
+        DocsReviewer.limpiarIssueActivo({ preservePinnedPopup: false });
+      }
+    }, 120);
+  },
+
+  cancelHidePopup() {
+    if (this.hidePopupTimer) {
+      window.clearTimeout(this.hidePopupTimer);
+      this.hidePopupTimer = null;
+    }
+  },
+
+  showPopup(issueId) {
+    const issue = DocsReviewer.getIssue(issueId);
+    const rects = this.currentRects.get(issueId) || [];
+
+    if (!issue || !rects.length || !this.popupElement) {
+      if (!this.pinnedIssueId) {
+        this.hidePopup();
+      }
+      return;
+    }
+
+    const triggerRect = rects[0];
+    this.popupElement.innerHTML = this.renderPopupHTML(issue);
+    this.popupElement.classList.remove("docs-reviewer-popup-hidden");
+    this.positionPopup(triggerRect);
+    requestAnimationFrame(() => {
+      if (
+        !this.popupElement?.classList.contains("docs-reviewer-popup-hidden")
+      ) {
+        this.positionPopup(triggerRect);
+      }
+    });
+    this.bindPopupActions(issue);
+  },
+
+  renderPopupHTML(issue) {
+    const canApply = issue.regla === "arcaismos" && issue.sugerencia;
+    const safeRuleName = this.escapeHTML(issue.reglaNombre);
+    const safeDescription = this.escapeHTML(issue.descripcion);
+    const safeOriginal = this.escapeHTML(issue.textoOriginal);
+    const suggestionHTML =
+      issue.sugerencia &&
+      issue.sugerencia !== "(simplifica dividiendo en múltiples oraciones)" &&
+      issue.sugerencia !== "(considera usar voz activa)"
+        ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
+        : "";
+
+    return `
+      <div class="docs-reviewer-popup-header">
+        <span class="docs-reviewer-popup-rule" style="--docs-reviewer-popup-color: ${issue.color}">${safeRuleName}</span>
+        <button type="button" class="docs-reviewer-popup-close" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="docs-reviewer-popup-body">
+        <div class="docs-reviewer-popup-description">${safeDescription}</div>
+        <div class="docs-reviewer-popup-original">${safeOriginal}</div>
+        ${suggestionHTML}
+      </div>
+      <div class="docs-reviewer-popup-actions">
+        ${
+          canApply
+            ? '<button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>'
+            : ""
+        }
+        <button type="button" class="docs-reviewer-popup-button" data-action="panel">Ir al panel</button>
+      </div>
+    `;
+  },
+
+  bindPopupActions(issue) {
+    this.popupElement
+      .querySelector(".docs-reviewer-popup-close")
+      ?.addEventListener("click", () => {
+        this.pinnedIssueId = null;
+        DocsReviewer.limpiarIssueActivo();
+      });
+
+    this.popupElement
+      .querySelector('[data-action="apply"]')
+      ?.addEventListener("click", () => {
+        DocsReviewer.aplicarCorreccion(issue.id);
+      });
+
+    this.popupElement
+      .querySelector('[data-action="panel"]')
+      ?.addEventListener("click", () => {
+        DocsPanel.enfocarIssue(issue.id);
+        this.pinnedIssueId = issue.id;
+        DocsReviewer.setIssueActivo(issue.id, {
+          showPopup: true,
+          pinPopup: true,
+          scrollPanel: true,
+        });
+      });
+  },
+
+  positionPopup(triggerRect) {
+    const popupRect = this.popupElement.getBoundingClientRect();
+    const margin = 12;
+    let left = triggerRect.left;
+    let top = triggerRect.bottom + margin;
+
+    if (left + popupRect.width > window.innerWidth - margin) {
+      left = window.innerWidth - popupRect.width - margin;
+    }
+    if (left < margin) {
+      left = margin;
+    }
+
+    if (top + popupRect.height > window.innerHeight - margin) {
+      top = triggerRect.top - popupRect.height - margin;
+    }
+    if (top < margin) {
+      top = margin;
+    }
+
+    this.popupElement.style.left = `${left}px`;
+    this.popupElement.style.top = `${top}px`;
+  },
+
+  hidePopup() {
+    if (!this.popupElement) return;
+    this.popupElement.classList.add("docs-reviewer-popup-hidden");
+    this.popupElement.innerHTML = "";
+  },
+
+  handleDocumentClick(event) {
+    if (
+      event.target.closest("#docs-reviewer-popup") ||
+      event.target.closest("#docs-reviewer-overlay") ||
+      event.target.closest("#docs-reviewer-panel")
+    ) {
+      return;
+    }
+
+    this.pinnedIssueId = null;
+    DocsReviewer.limpiarIssueActivo();
+  },
+
+  getScrollContainer() {
+    const root = this.getTextRoot();
+    let current = root;
+
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const overflowY = style.overflowY;
+      if (
+        (overflowY === "auto" || overflowY === "scroll") &&
+        current.scrollHeight > current.clientHeight
+      ) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+
+    return document.scrollingElement || document.documentElement;
+  },
+
+  scrollRectIntoView(rect) {
+    const container = this.getScrollContainer();
+    const isWindowContainer =
+      container === document.scrollingElement ||
+      container === document.documentElement;
+    const viewportHeight = isWindowContainer
+      ? window.innerHeight
+      : container.clientHeight;
+
+    if (rect.top >= 80 && rect.bottom <= viewportHeight - 80) {
+      return;
+    }
+
+    const delta = rect.top - viewportHeight / 2;
+    if (isWindowContainer) {
+      window.scrollBy({ top: delta, behavior: "smooth" });
+      return;
+    }
+
+    container.scrollBy({ top: delta, behavior: "smooth" });
+  },
+
+  escapeHTML(text) {
+    return String(text || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  },
 };

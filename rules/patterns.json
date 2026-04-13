@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "globalExclusions": [
+    "\\bsi\\s+que\\b",
+    "\\blo\\s+que\\b"
+  ],
+  "requiere_de_que": [
+    {
+      "id": "darse-cuenta",
+      "label": "darse cuenta",
+      "type": "queismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:darse\\s+cuenta|(?:me|te|se|nos|os)\\s+(?:di|doy|da|daba)\\s+cuenta)\\s+que\\b",
+      "suggestedPattern": "\\b(?:darse\\s+cuenta|(?:me|te|se|nos|os)\\s+(?:di|doy|da|daba)\\s+cuenta)\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": [
+        "\\bque\\s+si\\b"
+      ]
+    },
+    {
+      "id": "alegrarse",
+      "label": "alegrarse",
+      "type": "queismo",
+      "confidence": "media",
+      "triggerPattern": "\\b(?:alegrarse|me\\s+alegra|te\\s+alegra|se\\s+alegra|nos\\s+alegra)\\s+que\\b",
+      "suggestedPattern": "\\b(?:alegrarse|me\\s+alegra|te\\s+alegra|se\\s+alegra|nos\\s+alegra)\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
+    },
+    {
+      "id": "asegurarse",
+      "label": "asegurarse",
+      "type": "queismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:asegurarse|me\\s+aseguro|te\\s+aseguras|se\\s+asegura|nos\\s+aseguramos)\\s+que\\b",
+      "suggestedPattern": "\\b(?:asegurarse|me\\s+aseguro|te\\s+aseguras|se\\s+asegura|nos\\s+aseguramos)\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
+    },
+    {
+      "id": "convencerse",
+      "label": "convencerse",
+      "type": "queismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:convencerse|me\\s+convenzo|te\\s+convences|se\\s+convence|nos\\s+convencemos|estoy\\s+convencido)\\s+que\\b",
+      "suggestedPattern": "\\b(?:convencerse|me\\s+convenzo|te\\s+convences|se\\s+convence|nos\\s+convencemos|estoy\\s+convencido)\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
+    },
+    {
+      "id": "tener-certeza",
+      "label": "tener certeza",
+      "type": "queismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:tener\\s+certeza|tengo\\s+certeza|tenemos\\s+certeza|tenia\\s+certeza)\\s+que\\b",
+      "suggestedPattern": "\\b(?:tener\\s+certeza|tengo\\s+certeza|tenemos\\s+certeza|tenia\\s+certeza)\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
+    },
+    {
+      "id": "haber-posibilidad",
+      "label": "haber posibilidad",
+      "type": "queismo",
+      "confidence": "media",
+      "triggerPattern": "\\b(?:hay|habia|habra|habria)\\s+posibilidad\\s+que\\b",
+      "suggestedPattern": "\\b(?:hay|habia|habra|habria)\\s+posibilidad\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": []
+    },
+    {
+      "id": "a-pesar",
+      "label": "a pesar",
+      "type": "queismo",
+      "confidence": "baja",
+      "triggerPattern": "\\ba\\s+pesar\\s+que\\b",
+      "suggestedPattern": "\\ba\\s+pesar\\s+de\\s+que\\b",
+      "message": "Posible queismo",
+      "exclusions": [
+        "\\baun\\s+a\\s+pesar\\s+que\\b"
+      ]
+    }
+  ],
+  "nunca_de_que": [
+    {
+      "id": "afirmar",
+      "label": "afirmar",
+      "type": "dequeismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:afirmar|afirma|afirmo|afirmamos|afirmaron|afirmaba|afirmaban)\\s+de\\s+que\\b",
+      "suggestedPattern": "\\b(?:afirmar|afirma|afirmo|afirmamos|afirmaron|afirmaba|afirmaban)\\s+que\\b",
+      "message": "Posible dequeismo",
+      "exclusions": []
+    },
+    {
+      "id": "decir",
+      "label": "decir",
+      "type": "dequeismo",
+      "confidence": "alta",
+      "triggerPattern": "\\b(?:decir|dice|dijo|digo|dijeron|decia|decian)\\s+de\\s+que\\b",
+      "suggestedPattern": "\\b(?:decir|dice|dijo|digo|dijeron|decia|decian)\\s+que\\b",
+      "message": "Posible dequeismo",
+      "exclusions": []
+    },
+    {
+      "id": "sostener",
+      "label": "sostener",
+      "type": "dequeismo",
+      "confidence": "media",
+      "triggerPattern": "\\b(?:sostener|sostiene|sostengo|sostuvo|sostenia|sostenian)\\s+de\\s+que\\b",
+      "suggestedPattern": "\\b(?:sostener|sostiene|sostengo|sostuvo|sostenia|sostenian)\\s+que\\b",
+      "message": "Posible dequeismo",
+      "exclusions": []
+    },
+    {
+      "id": "alegar",
+      "label": "alegar",
+      "type": "dequeismo",
+      "confidence": "media",
+      "triggerPattern": "\\b(?:alegar|alega|alego|alegaba|alegaron)\\s+de\\s+que\\b",
+      "suggestedPattern": "\\b(?:alegar|alega|alego|alegaba|alegaron)\\s+que\\b",
+      "message": "Posible dequeismo",
+      "exclusions": []
+    }
+  ]
+}

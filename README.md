@@ -40,10 +40,10 @@ source ~/.nvm/nvm.sh && nvm use 22
 2. La extensión se inicializará automáticamente
 3. Aparecerá un panel flotante en la parte derecha del documento
 4. Los problemas detectados aparecerán:
-   - **Subrayados en rojo** → Arcaísmos
-   - **Subrayados en naranja** → Voz pasiva
-   - **Subrayados en amarillo** → Queísmo
-5. Hacer clic en los elementos del panel para ver detalles o aplicar cambios
+   - **Subrayados inline** sobre el documento
+   - **Popup contextual al hover** con regla, texto y sugerencia
+   - **Panel lateral sincronizado** con el overlay
+5. Hacer clic en un subrayado o en un elemento del panel para fijar el popup
 
 ## Estructura del Proyecto
 
@@ -102,11 +102,11 @@ window.docsReviewerRules.push(nuevaReglaRule);
 
 ### Cómo funciona
 
-- **Lectura**: Extrae texto de elementos `.kix-paragraphrenderer` de Google Docs
+- **Lectura**: Extrae el texto completo vía Google Docs API
 - **Análisis**: Aplica cada regla usando regex y patrones de texto
-- **Visualización**: Crea overlays HTML posicionados absolutamente sobre el texto
-- **Panel**: Muestra lista de problemas con sugerencias y permite aplicar cambios
-- **Actualización**: Usa `MutationObserver` para re-analizar en tiempo real (con debounce de 500ms)
+- **Visualización**: Reconcilia el texto de la API con la capa accesible visible de Docs para dibujar overlays inline
+- **Popup**: Muestra detalle contextual al hover y acciones al hacer click
+- **Panel**: Muestra la lista de problemas y se sincroniza con el overlay
 
 ### Limitaciones Actuales
 

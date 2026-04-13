@@ -25,26 +25,19 @@ The extension follows a modular design with four main layers:
 ### 1. **Core Orchestration** (`content/content.js`)
 - `DocsReviewer` object: Main entry point that initializes the extension
 - Runs all rules against document text and aggregates matches
-- Sets up a `MutationObserver` to re-analyze when the document changes (with 500ms debounce)
-- Coordinates between the reader, highlighter, and panel
+- Enriches matches with UI metadata (`color`, `reglaNombre`, `rects`, active state)
+- Coordinates synchronization between the reader, highlighter, and panel
 
 ### 2. **Text Extraction** (`content/reader.js`)
-- `DocsReader` object: Provides methods to read text from Google Docs
-- Selects paragraphs using `.kix-paragraphrenderer` (Google Docs' internal class)
-- Key methods:
-  - `leerTextoCompleto()`: Returns entire document as concatenated text with `\n` separators
-  - `leerParagrafos()`: Returns array of paragraph objects with position data
-  - `esperarDocumentoListo()`: Waits up to 5 seconds for Google Docs DOM to be ready
-  - `buscarParrafo(textoPartial)`: Finds a specific paragraph by partial text match
-
-**Important**: Position calculations depend on consistent `\n` joining. The highlighter tracks cumulative character positions across paragraphs.
+- `DocsReader` object: Reads full text from Google Docs through the background service worker and OAuth
+- `leerTextoCompleto()` is the source of truth for rule offsets
+- `esperarDocumentoListo()` only verifies that the URL belongs to a Google Doc
 
 ### 3. **Visual Highlighting** (`content/highlighter.js`)
-- `DocsHighlighter` object: Creates visual underlines over detected issues
-- Uses a `NodeIterator` to traverse text nodes and wrap matches in `<span>` elements
-- Color-coded by rule (red for archaisms, orange for passive voice, yellow for queísmo)
-- Applies `border-bottom: 3px wavy [color]` for the visual effect
-- Updates whenever `DocsReviewer.analizarDocumento()` is called
+- `DocsHighlighter` object: Creates fixed-position overlay markers over the visible Google Docs text layer
+- Builds a normalized visible-text model from the accessibility layer (`docos-stream-view` / related roles)
+- Reconciles issue text against the visible layer in reading order and converts matches into `Range#getClientRects()`
+- Renders inline markers plus a contextual popup with hover/click interactions
 
 ### 4. **Rule System** (`rules/`)
 Each rule file exports an object to `window.docsReviewerRules[]` with this structure:
@@ -74,16 +67,16 @@ const ruleObject = {
 ### 5. **UI Panel** (`content/panel.js`, `panel/`)
 - `DocsPanel` object: Manages the floating sidebar
 - Injects HTML from `panel/panel.html` and CSS from `panel/panel.css`
-- Displays issue list, counts by rule, and handles panel interactions
+- Displays issue list, counts by rule, and shares active-state sync with the inline overlay
+- Clicking panel items attempts to focus the corresponding inline marker and popup
 
 ## Data Flow
 
-1. **Initialization**: `content.js` waits for `.kix-appview` and at least one `.kix-paragraphrenderer`
-2. **Analysis**: Reads full text → runs each rule's `detectar()` method → collects all matches → sorts by position
-3. **Visualization**: For each match, finds the containing paragraph, wraps the matched text in a styled `<span>`
-4. **Updates**: `MutationObserver` watches `.kix-appview` (debounced 500ms) and re-runs the full analysis
-
-Position tracking is critical: `leerTextoCompleto()` joins paragraphs with `\n`, so rules' `inicio`/`fin` values must align with this format.
+1. **Initialization**: `content.js` verifies the page is a Google Doc, injects panel, initializes highlighter, and starts analysis
+2. **Analysis**: Reads full text → runs each rule's `detectar()` method → enriches matches with UI metadata → sorts by position
+3. **Visualization**: Highlighter builds a normalized text model from the visible accessibility layer and maps issues to viewport rects
+4. **Interaction**: Panel hover/click and inline hover/click keep a shared active issue state
+5. **Updates**: Overlay positions are recalculated on scroll, resize, and DOM mutations in the visible text layer
 
 ## Adding New Rules
 
@@ -100,14 +93,14 @@ Position tracking is critical: `leerTextoCompleto()` joins paragraphs with `\n`,
 ## Key Implementation Details
 
 ### Text Position Tracking
-- `leerTextoCompleto()` joins paragraphs with literal `\n` characters
-- Highlighter tracks cumulative position: `textoAcumulado += textoParrafo.length + 1` (the `+1` is the newline)
-- **Bug zone**: If paragraph extraction or joining logic changes, position tracking breaks silently
+- `leerTextoCompleto()` from the Docs API remains the source of truth for issue offsets
+- The overlay does not trust raw DOM positions directly; it normalizes visible text and maps issue text back into `Range` rects
+- **Bug zone**: If the accessibility layer diverges from the API text, some issues may stay panel-only until the mapper is adjusted
 
 ### MutationObserver Strategy
-- Observes `.kix-appview` for `childList`, `subtree`, and `characterData` changes
-- Debounced to 500ms to avoid re-analyzing on every keystroke
-- Called on every change (no filtering), so document size can impact responsiveness
+- The highlighter observes the visible text root to recalculate inline rects
+- Analysis is still triggered explicitly; the observer is for overlay repositioning, not rule execution
+- Scroll and resize also trigger rect recalculation because the overlay is viewport-relative
 
 ### Current Limitations
 - Manual match application (copy/paste, no auto-replace)
@@ -125,6 +118,6 @@ Position tracking is critical: `leerTextoCompleto()` joins paragraphs with `\n`,
 
 - **Manifest Version**: 3
 - **Content Scripts**: Injected into `https://docs.google.com/*`
-- **Run At**: `document_start` (earliest possible)
+- **Run At**: `document_idle`
 - **Script Load Order**: Rules first, then readers/highlighters/panel, then orchestration (`content.js`)
-- **Permissions**: Only `storage` (not actively used yet)
+- **Permissions**: `storage`, `identity`
