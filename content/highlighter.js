@@ -11,6 +11,7 @@ const DocsHighlighter = {
   recalcFrame: 0,
   hidePopupTimer: null,
   mutationObserver: null,
+  reanalysisTimer: null,
 
   inicializar() {
     if (this.overlayElement && this.popupElement) return;
@@ -74,6 +75,10 @@ const DocsHighlighter = {
       cancelAnimationFrame(this.recalcFrame);
       this.recalcFrame = 0;
     }
+    if (this.reanalysisTimer) {
+      clearTimeout(this.reanalysisTimer);
+      this.reanalysisTimer = null;
+    }
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
       this.mutationObserver = null;
@@ -127,6 +132,15 @@ const DocsHighlighter = {
       this.recalcFrame = 0;
       this.recalcularPosiciones();
     });
+  },
+
+  scheduleReanalysis() {
+    if (this.reanalysisTimer) clearTimeout(this.reanalysisTimer);
+    this.reanalysisTimer = setTimeout(() => {
+      this.reanalysisTimer = null;
+      console.log("[Legal Docs] Re-analizando documento tras edición...");
+      DocsReviewer.analizarDocumento();
+    }, 2000);
   },
 
   setIssueActivo(issueId, options = {}) {
@@ -281,8 +295,31 @@ const DocsHighlighter = {
     const textRoot = this.getTextRoot();
     if (!textRoot) return;
 
-    this.mutationObserver = new MutationObserver(() => {
+    this.mutationObserver = new MutationObserver((mutations) => {
+      // Always reposition overlays — layout may have shifted.
       this.scheduleRecalculate();
+
+      // Fire re-analysis only for actual text content changes.
+      const hasTextChange = mutations.some((mutation) => {
+        if (mutation.type === "characterData") return true;
+        if (mutation.type === "childList") {
+          for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
+            if (node.nodeType === Node.TEXT_NODE) return true;
+            if (
+              node.nodeType === Node.ELEMENT_NODE &&
+              node.textContent?.trim()
+            ) {
+              return true;
+            }
+          }
+        }
+        // attributes-only mutations are layout signals only — do NOT re-analyze.
+        return false;
+      });
+
+      if (hasTextChange) {
+        this.scheduleReanalysis();
+      }
     });
     this.mutationObserver.observe(textRoot, {
       childList: true,
@@ -415,6 +452,7 @@ const DocsHighlighter = {
     this.issues.forEach((issue) => {
       let startIndex = issue.normalizedStart;
       let endIndex = issue.normalizedEnd;
+      const normalizedNeedle = this.normalizeText(issue.textoOriginal);
 
       // Determine whether we need to run the text-based indexOf fallback.
       // Three cases require it:
@@ -431,7 +469,6 @@ const DocsHighlighter = {
         endIndex > textModel.charMap.length;
 
       if (needsTextFallback) {
-        const normalizedNeedle = this.normalizeText(issue.textoOriginal);
         if (!normalizedNeedle) {
           issue.rects = [];
           issue.isVisible = false;
@@ -439,17 +476,11 @@ const DocsHighlighter = {
           return;
         }
 
-        // Search for the needle in the normalized text.
-        // If we have an approximate startIndex from the pre-computed position (even if endIndex overflowed),
-        // search from a window around that position to find the closest match.
-        // Otherwise, search from the beginning.
-        let searchStart = 0;
-        if (Number.isInteger(startIndex) && startIndex >= 0) {
-          // We have a partial position; search in a window around it.
-          searchStart = Math.max(0, startIndex - 10);
-        }
-
-        startIndex = textModel.normalizedLower.indexOf(normalizedNeedle, searchStart);
+        startIndex = this.findBestNeedleMatch(
+          textModel.normalizedLower,
+          normalizedNeedle,
+          startIndex,
+        );
         if (startIndex === -1) {
           issue.rects = [];
           issue.isVisible = false;
@@ -472,9 +503,29 @@ const DocsHighlighter = {
         startIndex,
         endIndex,
       );
-      const rects = range
+      let rects = range
         ? this.normalizeRects(Array.from(range.getClientRects()))
         : [];
+
+      // If the range mapped by offsets produced no visible rects, retry by text.
+      if (!rects.length && normalizedNeedle) {
+        const fallbackStart = this.findBestNeedleMatch(
+          textModel.normalizedLower,
+          normalizedNeedle,
+          startIndex,
+        );
+
+        if (fallbackStart !== -1 && fallbackStart !== startIndex) {
+          const fallbackRange = this.createRangeFromIndices(
+            textModel.charMap,
+            fallbackStart,
+            fallbackStart + normalizedNeedle.length,
+          );
+          rects = fallbackRange
+            ? this.normalizeRects(Array.from(fallbackRange.getClientRects()))
+            : [];
+        }
+      }
 
       issue.rects = rects;
       issue.isVisible = rects.length > 0;
@@ -486,6 +537,39 @@ const DocsHighlighter = {
 
   normalizeText(text) {
     return (text || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  },
+
+  findBestNeedleMatch(haystack, needle, preferredStart) {
+    if (!needle || !haystack) return -1;
+
+    let directStart = 0;
+    if (Number.isInteger(preferredStart) && preferredStart >= 0) {
+      directStart = Math.max(0, preferredStart - 40);
+    }
+
+    const direct = haystack.indexOf(needle, directStart);
+    if (direct !== -1) {
+      return direct;
+    }
+
+    if (!Number.isInteger(preferredStart) || preferredStart < 0) {
+      return haystack.indexOf(needle);
+    }
+
+    let bestIndex = -1;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    let next = haystack.indexOf(needle);
+
+    while (next !== -1) {
+      const distance = Math.abs(next - preferredStart);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = next;
+      }
+      next = haystack.indexOf(needle, next + 1);
+    }
+
+    return bestIndex;
   },
 
   createRangeFromIndices(charMap, startIndex, endIndex) {

@@ -36,13 +36,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     );
     return true;
   }
-
-  if (request.type === "APPLY_BATCH_UPDATE") {
-    respond(() =>
-      handleBatchUpdate(request.docId, request.requests),
-    );
-    return true;
-  }
 });
 
 function createError(message, code = "UNKNOWN") {
@@ -203,32 +196,6 @@ async function handleApplyReplacement(
             },
           },
         ];
-
-  const response = await fetch(
-    `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ requests }),
-    },
-  );
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw createError(
-      `Docs API error ${response.status}: ${body}`,
-      "DOCS_API_ERROR",
-    );
-  }
-
-  return { success: true };
-}
-
-async function handleBatchUpdate(docId, requests) {
-  const token = await getAuthToken({ interactive: false });
 
   const response = await fetch(
     `https://docs.googleapis.com/v1/documents/${encodeURIComponent(docId)}:batchUpdate`,

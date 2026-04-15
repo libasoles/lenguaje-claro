@@ -114,7 +114,9 @@ const queismoRule = {
 
     if (nlp) {
       try {
-        const sentenceTexts = nlp(texto).sentences().out("array");
+        const doc = nlp(texto);
+        const splitFn = typeof doc.sentences === "function" ? doc.sentences() : doc.fullSentences();
+        const sentenceTexts = splitFn.out("array");
         const mapped = [];
         let cursor = 0;
 

@@ -10,6 +10,8 @@ const DocsReviewer = {
   sourceSegments: [],
   undoStack: [],
   isUndoInFlight: false,
+  isAnalyzing: false,
+  _pendingReanalysis: false,
 
   async init() {
     if (this.isInitialized) return;
@@ -99,135 +101,85 @@ const DocsReviewer = {
   },
 
   async analizarDocumento(options = {}) {
-    DocsPanel.mostrarCargando();
-    DocsHighlighter.limpiar();
-    console.log("[Legal Docs] Obteniendo texto del documento...");
-
-    const documento = await DocsReader.leerDocumento(options);
-    const textoCompleto = documento?.text;
-
-    if (!textoCompleto) {
-      const readError = DocsReader.lastReadError;
-
-      console.log("[Legal Docs] No se pudo obtener el texto del documento");
-
-      if (readError?.code === "AUTH_REQUIRED") {
-        DocsPanel.mostrarErrorAuth();
-        return;
-      }
-
-      DocsPanel.mostrarError(readError?.message || "Sin acceso al documento.");
+    if (this.isAnalyzing) {
+      this._pendingReanalysis = true;
       return;
     }
 
-    console.log(
-      "[Legal Docs] Texto leído (" + textoCompleto.length + " chars):",
-      textoCompleto.substring(0, 100),
-    );
-    this.sourceText = textoCompleto;
-    this.sourceSegments = Array.isArray(documento?.segments)
-      ? documento.segments
-      : [];
-
-    const collectedMatches = [];
-
-    if (window.docsReviewerRules?.length > 0) {
-      window.docsReviewerRules.forEach((regla) => {
-        try {
-          const matches = regla.detectar(textoCompleto);
-          console.log(
-            `[Legal Docs] Regla ${regla.id}: ${matches.length} coincidencias`,
-          );
-          collectedMatches.push(...matches);
-        } catch (e) {
-          console.error(`[Legal Docs] Error en regla ${regla.id}:`, e);
-        }
-      });
-    } else {
-      console.warn("[Legal Docs] No hay reglas disponibles");
-    }
-
-    this.allMatches = this.enriquecerMatches(collectedMatches).sort((a, b) => {
-      if (a.inicio !== b.inicio) return a.inicio - b.inicio;
-      return a.fin - b.fin;
-    });
-    this.issuesById = new Map(
-      this.allMatches.map((issue) => [issue.id, issue]),
-    );
-    this.activeIssueId = null;
-
-    console.log(
-      `[Legal Docs] Total: ${this.allMatches.length} problemas detectados`,
-    );
-
-    DocsPanel.actualizarIssues(this.allMatches);
-    await this.aplicarResaltesEnAPI();
-    await DocsHighlighter.aplicarHighlights(this.allMatches);
-  },
-
-  async aplicarResaltesEnAPI() {
-    const docId = DocsReader.getDocumentId();
-    if (!docId || !this.allMatches.length) return;
-
-    const requests = [];
-
-    this.allMatches.forEach((issue) => {
-      const apiRange = this.mapStringRangeToApiRange(
-        this.sourceSegments,
-        issue.inicio,
-        issue.fin,
-      );
-
-      if (!apiRange) return;
-
-      const bgColor = "FFF3CD"; // Amarillo — igual que el sidebar
-
-      requests.push({
-        updateTextStyle: {
-          range: apiRange,
-          textStyle: {
-            backgroundColor: {
-              color: {
-                rgbColor: this.hexToRgb(bgColor),
-              },
-            },
-          },
-          fields: "backgroundColor",
-        },
-      });
-    });
-
-    if (requests.length === 0) return;
+    this.isAnalyzing = true;
+    this._pendingReanalysis = false;
 
     try {
-      chrome.runtime.sendMessage(
-        {
-          type: "APPLY_BATCH_UPDATE",
-          docId,
-          requests,
-        },
-        (response) => {
-          if (response?.success) {
-            console.log(`[Legal Docs] ${requests.length} resaltes aplicados en API`);
-          } else {
-            console.error("[Legal Docs] Error aplicando resaltes:", response?.error);
-          }
-        },
-      );
-    } catch (error) {
-      console.error("[Legal Docs] Error en aplicarResaltesEnAPI:", error);
-    }
-  },
+      DocsPanel.mostrarCargando();
+      DocsHighlighter.limpiar();
+      console.log("[Legal Docs] Obteniendo texto del documento...");
 
-  hexToRgb(hex) {
-    const result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-      ? {
-          red: parseInt(result[1], 16) / 255,
-          green: parseInt(result[2], 16) / 255,
-          blue: parseInt(result[3], 16) / 255,
+      const documento = await DocsReader.leerDocumento(options);
+      const textoCompleto = documento?.text;
+
+      if (!textoCompleto) {
+        const readError = DocsReader.lastReadError;
+
+        console.log("[Legal Docs] No se pudo obtener el texto del documento");
+
+        if (readError?.code === "AUTH_REQUIRED") {
+          DocsPanel.mostrarErrorAuth();
+          return;
         }
-      : { red: 1, green: 1, blue: 0.8 };
+
+        DocsPanel.mostrarError(readError?.message || "Sin acceso al documento.");
+        return;
+      }
+
+      console.log(
+        "[Legal Docs] Texto leído (" + textoCompleto.length + " chars):",
+        textoCompleto.substring(0, 100),
+      );
+      this.sourceText = textoCompleto;
+      this.sourceSegments = Array.isArray(documento?.segments)
+        ? documento.segments
+        : [];
+
+      const collectedMatches = [];
+
+      if (window.docsReviewerRules?.length > 0) {
+        window.docsReviewerRules.forEach((regla) => {
+          try {
+            const matches = regla.detectar(textoCompleto);
+            console.log(
+              `[Legal Docs] Regla ${regla.id}: ${matches.length} coincidencias`,
+            );
+            collectedMatches.push(...matches);
+          } catch (e) {
+            console.error(`[Legal Docs] Error en regla ${regla.id}:`, e);
+          }
+        });
+      } else {
+        console.warn("[Legal Docs] No hay reglas disponibles");
+      }
+
+      this.allMatches = this.enriquecerMatches(collectedMatches).sort((a, b) => {
+        if (a.inicio !== b.inicio) return a.inicio - b.inicio;
+        return a.fin - b.fin;
+      });
+      this.issuesById = new Map(
+        this.allMatches.map((issue) => [issue.id, issue]),
+      );
+      this.activeIssueId = null;
+
+      console.log(
+        `[Legal Docs] Total: ${this.allMatches.length} problemas detectados`,
+      );
+
+      DocsPanel.actualizarIssues(this.allMatches);
+      await DocsHighlighter.aplicarHighlights(this.allMatches);
+    } finally {
+      this.isAnalyzing = false;
+      if (this._pendingReanalysis) {
+        this._pendingReanalysis = false;
+        setTimeout(() => this.analizarDocumento(), 0);
+      }
+    }
   },
 
   getIssue(issueOrId) {
