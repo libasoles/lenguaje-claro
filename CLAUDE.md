@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Setup
 
 - **Node.js version**: 22 (specified in `.nvmrc`)
-- **No build process**: The extension runs directly from source files without bundling or compilation
+- **No bundling step**: The extension runs directly from source files, but `manifest.json` is generated from `manifest.template.json`
 - **Manifest Version**: 3 (Chrome's current standard)
 
 To load the extension for development:
@@ -20,12 +20,12 @@ To load the extension for development:
 
 ### OAuth Configuration
 
-The extension uses Google OAuth to access the Google Docs API. The OAuth client ID is stored in `manifest.json` but should be managed via a `.env` file:
+The extension uses Google OAuth to access the Google Docs API. The OAuth client ID should be managed via `.env`, and `manifest.json` is generated from `manifest.template.json`:
 
 1. Copy `.env.example` to `.env` (if not already done)
 2. Update the `CHROME_OAUTH_CLIENT_ID` value in `.env` with your OAuth client ID from [Google Cloud Console](https://console.cloud.google.com)
-3. Update `manifest.json`'s `oauth2.client_id` field with the same value
-4. The `.env` file is git-ignored and will not be committed (see `.gitignore`)
+3. Run `npm run build` to generate `manifest.json`
+4. The `.env` file and generated `manifest.json` are git-ignored (see `.gitignore`)
 
 ## Architecture
 

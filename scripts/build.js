@@ -1,16 +1,37 @@
 #!/usr/bin/env node
-// Genera manifest.json leyendo GOOGLE_CLIENT_ID desde .env
+// Genera manifest.json leyendo el OAuth client ID desde .env
 
 const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 
+function stripTemplateComments(value) {
+  if (Array.isArray(value)) {
+    return value.map(stripTemplateComments);
+  }
+
+  if (value && typeof value === "object") {
+    const result = {};
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      if (key.startsWith("_comment")) {
+        return;
+      }
+      result[key] = stripTemplateComments(nestedValue);
+    });
+    return result;
+  }
+
+  return value;
+}
+
 // Cargar .env
 const envPath = path.join(ROOT, ".env");
 if (!fs.existsSync(envPath)) {
   console.error("Error: no se encontró el archivo .env.");
-  console.error("Copia .env.example a .env y establece GOOGLE_CLIENT_ID.");
+  console.error(
+    "Copia .env.example a .env y establece CHROME_OAUTH_CLIENT_ID."
+  );
   process.exit(1);
 }
 
@@ -29,9 +50,9 @@ fs.readFileSync(envPath, "utf8")
     }
   });
 
-const clientId = envVars["GOOGLE_CLIENT_ID"];
+const clientId = envVars["CHROME_OAUTH_CLIENT_ID"];
 if (!clientId) {
-  console.error("Error: GOOGLE_CLIENT_ID no está definido en .env.");
+  console.error("Error: define CHROME_OAUTH_CLIENT_ID en .env.");
   process.exit(1);
 }
 
@@ -40,7 +61,12 @@ const templatePath = path.join(ROOT, "manifest.template.json");
 const template = fs.readFileSync(templatePath, "utf8");
 
 // Reemplazar placeholder
-const manifest = template.replace("__GOOGLE_CLIENT_ID__", clientId);
+const manifestWithClientId = template.replace(
+  "__CHROME_OAUTH_CLIENT_ID__",
+  clientId
+);
+const manifestObject = stripTemplateComments(JSON.parse(manifestWithClientId));
+const manifest = JSON.stringify(manifestObject, null, 2) + "\n";
 
 // Escribir manifest.json
 const manifestPath = path.join(ROOT, "manifest.json");

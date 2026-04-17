@@ -31,14 +31,22 @@ cd lenguaje-claro
 source ~/.nvm/nvm.sh && nvm use 22
 ```
 
-### 2. Cargar la extensión en Chrome
+### 2. Generar el manifest
+
+```bash
+npm run build
+```
+
+Este paso crea `manifest.json` a partir de `manifest.template.json` e inyecta `CHROME_OAUTH_CLIENT_ID` desde `.env`.
+
+### 3. Cargar la extensión en Chrome
 
 1. Abrir Chrome y navegar a `chrome://extensions`
 2. Activar "Modo de desarrollador" (esquina superior derecha)
 3. Hacer clic en "Cargar extensión sin empaquetar"
 4. Seleccionar la carpeta `lenguaje-claro`
 
-### 3. Usar la extensión
+### 4. Usar la extensión
 
 1. Abrir un documento en [Google Docs](https://docs.google.com)
 2. La extensión se inicializará automáticamente

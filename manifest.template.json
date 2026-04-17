@@ -1,4 +1,5 @@
 {
+  "_comment": "Edita aqui y luego corre `npm run build` para generar manifest.json con el client ID tomado de .env.",
   "manifest_version": 3,
   "name": "Lenguaje claro",
   "version": "0.1.0",
@@ -6,7 +7,7 @@
   "permissions": ["storage", "identity"],
   "host_permissions": ["https://docs.googleapis.com/*"],
   "oauth2": {
-    "client_id": "__GOOGLE_CLIENT_ID__",
+    "client_id": "__CHROME_OAUTH_CLIENT_ID__",
     "scopes": ["https://www.googleapis.com/auth/documents"]
   },
   "background": {
@@ -18,15 +19,30 @@
     "48": "assets/icons/icon-48.png",
     "128": "assets/icons/icon-128.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/*", "rules/patterns.json"],
+      "matches": ["https://docs.google.com/*"]
+    }
+  ],
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/*"],
+      "js": ["content/canvas-patcher.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://docs.google.com/*"],
       "js": [
+        "vendor/compromise.min.js",
+        "vendor/es-compromise.min.js",
         "rules/index.js",
         "rules/arcaismos.js",
         "rules/voz-pasiva.js",
         "rules/queismo.js",
         "content/reader.js",
+        "content/highlighter.js",
         "content/panel.js",
         "content/content.js"
       ],
