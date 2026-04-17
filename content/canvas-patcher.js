@@ -6,8 +6,30 @@
 (function () {
   'use strict';
 
-  // Map from canvas element → fragment[]
-  const canvasFragments = new Map();
+  const RENDER_BURST_GAP_MS = 40;
+
+  // Map from canvas element → { fragments, lastWriteAt }
+  const canvasStates = new Map();
+
+  function getNow() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+
+    return Date.now();
+  }
+
+  function ensureCanvasState(canvas) {
+    let state = canvasStates.get(canvas);
+    if (!state) {
+      state = {
+        fragments: [],
+        lastWriteAt: -Infinity,
+      };
+      canvasStates.set(canvas, state);
+    }
+    return state;
+  }
 
   function serializeMatrix(ctx) {
     if (typeof ctx.getTransform !== 'function') {
@@ -29,7 +51,9 @@
   CanvasRenderingContext2D.prototype.clearRect = function (x, y, w, h) {
     // Full-canvas clear signals a new render cycle for this tile.
     if (x === 0 && y === 0 && w >= this.canvas.width && h >= this.canvas.height) {
-      canvasFragments.set(this.canvas, []);
+      const state = ensureCanvasState(this.canvas);
+      state.fragments = [];
+      state.lastWriteAt = -Infinity;
     }
     return origClearRect.apply(this, arguments);
   };
@@ -38,12 +62,17 @@
   CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
     if (text && text.trim().length > 0) {
       const canvas = this.canvas;
-      let frags = canvasFragments.get(canvas);
-      if (!frags) {
-        frags = [];
-        canvasFragments.set(canvas, frags);
+      const state = ensureCanvasState(canvas);
+      const now = getNow();
+
+      // Google Docs frequently redraws the same canvas after edits/reflow
+      // without a full clearRect. Treat temporally separated fillText bursts
+      // as a fresh snapshot so old positions do not linger indefinitely.
+      if (now - state.lastWriteAt > RENDER_BURST_GAP_MS) {
+        state.fragments = [];
       }
-      frags.push({
+      state.lastWriteAt = now;
+      state.fragments.push({
         text,
         x,
         y,
@@ -60,7 +89,8 @@
   // Respond to content script fragment requests with serialized, viewport-resolved data.
   document.addEventListener('docs-reviewer-request-fragments', function () {
     const result = [];
-    canvasFragments.forEach(function (frags, canvas) {
+    canvasStates.forEach(function (state, canvas) {
+      const frags = state.fragments;
       if (!frags.length || !canvas.isConnected) return;
       const rect = canvas.getBoundingClientRect();
       if (!rect.width || !rect.height) return;

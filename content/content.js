@@ -124,6 +124,11 @@ const DocsReviewer = {
 
         console.log("[Legal Docs] No se pudo obtener el texto del documento");
 
+        if (readError?.code === "EXTENSION_CONTEXT_INVALIDATED") {
+          this.manejarContextoExtensionInvalidado(readError);
+          return;
+        }
+
         if (readError?.code === "AUTH_REQUIRED") {
           DocsPanel.mostrarErrorAuth();
           return;
@@ -221,7 +226,27 @@ const DocsReviewer = {
     return DocsHighlighter.focusIssue(issue.id, focusOptions);
   },
 
-  aplicarCorreccion(issueOrId) {
+  esContextoExtensionInvalidado(error) {
+    return (
+      error?.code === "EXTENSION_CONTEXT_INVALIDATED" ||
+      DocsRuntime.isContextInvalidated(error)
+    );
+  },
+
+  manejarContextoExtensionInvalidado(error) {
+    console.warn(
+      "[Legal Docs] El contexto de la extensión fue invalidado:",
+      error?.originalMessage || error?.message || error,
+    );
+
+    this.allMatches = [];
+    this.issuesById = new Map();
+    this.activeIssueId = null;
+    DocsHighlighter.limpiar();
+    DocsPanel.mostrarErrorExtensionRecargada();
+  },
+
+  async aplicarCorreccion(issueOrId) {
     const issue = this.getIssue(issueOrId);
     if (!issue) return;
 
@@ -239,41 +264,41 @@ const DocsReviewer = {
         return;
       }
 
-      chrome.runtime.sendMessage(
-        {
+      try {
+        const response = await DocsRuntime.sendMessage({
           type: "APPLY_REPLACEMENT",
           docId,
           original: issue.textoOriginal,
           replacement: issue.sugerencia,
           range: apiRange,
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "[Legal Docs] Error al aplicar corrección:",
-              chrome.runtime.lastError.message,
-            );
-            alert("Error al aplicar la corrección. Inténtalo de nuevo.");
-            return;
-          }
+        });
 
-          if (response?.success) {
-            this.undoStack.push({
-              originalText: issue.textoOriginal,
-              replacementText: issue.sugerencia,
-              sourceStart: issue.inicio,
-            });
-            this.analizarDocumento();
-            return;
-          }
+        if (response?.success) {
+          this.undoStack.push({
+            originalText: issue.textoOriginal,
+            replacementText: issue.sugerencia,
+            sourceStart: issue.inicio,
+          });
+          await this.analizarDocumento();
+          return;
+        }
 
-          console.error("[Legal Docs] Error de API:", response?.error);
-          alert(
-            "Error al aplicar la corrección: " +
-              (response?.error || "desconocido"),
-          );
-        },
-      );
+        console.error("[Legal Docs] Error de API:", response?.error);
+        alert(
+          "Error al aplicar la corrección: " + (response?.error || "desconocido"),
+        );
+      } catch (error) {
+        if (this.esContextoExtensionInvalidado(error)) {
+          this.manejarContextoExtensionInvalidado(error);
+          return;
+        }
+
+        console.error(
+          "[Legal Docs] Error al aplicar corrección:",
+          error?.originalMessage || error?.message || error,
+        );
+        alert("Error al aplicar la corrección. Inténtalo de nuevo.");
+      }
       return;
     }
 
@@ -293,7 +318,7 @@ const DocsReviewer = {
 
       event.preventDefault();
       event.stopPropagation();
-      this.deshacerUltimoCambio();
+      void this.deshacerUltimoCambio();
     });
   },
 
@@ -309,6 +334,11 @@ const DocsReviewer = {
     try {
       const documento = await DocsReader.leerDocumento({ interactive: true });
       if (!documento?.text) {
+        if (DocsReader.lastReadError?.code === "EXTENSION_CONTEXT_INVALIDATED") {
+          this.manejarContextoExtensionInvalidado(DocsReader.lastReadError);
+          return;
+        }
+
         throw new Error(
           "No se pudo leer el documento para deshacer el cambio.",
         );
@@ -336,22 +366,13 @@ const DocsReviewer = {
         throw new Error("No se pudo mapear el cambio al documento actual.");
       }
 
-      const response = await new Promise((resolve) => {
-        chrome.runtime.sendMessage(
-          {
-            type: "APPLY_REPLACEMENT",
-            docId,
-            original: lastChange.replacementText,
-            replacement: lastChange.originalText,
-            range: apiRange,
-          },
-          resolve,
-        );
+      const response = await DocsRuntime.sendMessage({
+        type: "APPLY_REPLACEMENT",
+        docId,
+        original: lastChange.replacementText,
+        replacement: lastChange.originalText,
+        range: apiRange,
       });
-
-      if (chrome.runtime.lastError) {
-        throw new Error(chrome.runtime.lastError.message);
-      }
 
       if (!response?.success) {
         throw new Error(response?.error || "No se pudo deshacer el cambio.");
@@ -360,6 +381,11 @@ const DocsReviewer = {
       this.undoStack.pop();
       await this.analizarDocumento();
     } catch (error) {
+      if (this.esContextoExtensionInvalidado(error)) {
+        this.manejarContextoExtensionInvalidado(error);
+        return;
+      }
+
       console.error("[Legal Docs] Error al deshacer cambio:", error);
       alert(error.message || "No se pudo deshacer el cambio.");
     } finally {

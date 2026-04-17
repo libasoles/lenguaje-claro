@@ -12,53 +12,52 @@ const DocsReader = {
 
   // Obtiene el texto completo contactando al background service worker,
   // que a su vez llama a la Google Docs API con OAuth.
-  leerDocumento(options = {}) {
+  async leerDocumento(options = {}) {
     const docId = this.getDocumentId();
-    if (!docId) return Promise.resolve(null);
+    if (!docId) return null;
 
     this.lastReadError = null;
 
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage(
+    try {
+      const response = await DocsRuntime.sendMessage(
         {
           type: "GET_DOC_TEXT",
           docId,
           interactive: Boolean(options.interactive),
         },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            this.lastReadError = {
-              code: "MESSAGE_CHANNEL_ERROR",
-              message: chrome.runtime.lastError.message,
-            };
-            console.error(
-              "[Legal Docs] Error de comunicación con background:",
-              chrome.runtime.lastError.message,
-            );
-            resolve(null);
-            return;
-          }
-          if (response?.error) {
-            this.lastReadError = {
-              code: response.errorCode || "BACKGROUND_ERROR",
-              message: response.error,
-            };
-            console.error("[Legal Docs] Error de API:", response.error);
-            resolve(null);
-            return;
-          }
-          if (!response?.text) {
-            resolve(null);
-            return;
-          }
-
-          resolve({
-            text: response.text,
-            segments: Array.isArray(response.segments) ? response.segments : [],
-          });
-        },
       );
-    });
+
+      if (response?.error) {
+        this.lastReadError = {
+          code: response.errorCode || "BACKGROUND_ERROR",
+          message: response.error,
+        };
+        console.error("[Legal Docs] Error de API:", response.error);
+        return null;
+      }
+
+      if (!response?.text) {
+        return null;
+      }
+
+      return {
+        text: response.text,
+        segments: Array.isArray(response.segments) ? response.segments : [],
+      };
+    } catch (error) {
+      const code = error?.code || "MESSAGE_CHANNEL_ERROR";
+      this.lastReadError = {
+        code,
+        message: error?.message || "No se pudo comunicar con la extensión.",
+      };
+      const logMessage = error?.originalMessage || error?.message;
+      if (code === "EXTENSION_CONTEXT_INVALIDATED") {
+        console.warn("[Legal Docs] El contexto de la extensión fue invalidado (recargá la página):", logMessage);
+      } else {
+        console.error("[Legal Docs] Error de comunicación con background:", logMessage);
+      }
+      return null;
+    }
   },
 
   leerTextoCompleto(options = {}) {

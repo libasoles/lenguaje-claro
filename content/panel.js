@@ -9,16 +9,25 @@ const DocsPanel = {
     try {
       await DocsReader.esperarDocumentoListo();
 
-      const logoURL = chrome.runtime.getURL("assets/icons/hammer.svg");
+      const logoURL = DocsRuntime.getURL("assets/icons/hammer.svg");
+      const logoMarkup = logoURL
+        ? `<img src="${logoURL}" class="docs-reviewer-logo" alt="" />`
+        : "";
       const panelHTML = `
         <div id="docs-reviewer-panel" class="docs-reviewer-panel">
           <div class="docs-reviewer-header">
             <div class="docs-reviewer-title">
-              <img src="${logoURL}" class="docs-reviewer-logo" alt="" />
+              ${logoMarkup}
               <h3>Lenguaje claro</h3>
             </div>
             <div class="docs-reviewer-header-buttons">
-              <button id="docs-reviewer-reanalizar" class="docs-reviewer-reanalyze" title="Re-analizar documento">↺</button>
+              <button id="docs-reviewer-reanalizar" class="docs-reviewer-reanalyze" title="Re-analizar documento">
+                <svg class="docs-reviewer-reanalyze-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                  <path d="M21 3v6h-6" />
+                </svg>
+                <span class="docs-reviewer-sr-only">↺</span>
+              </button>
               <button id="docs-reviewer-close" class="docs-reviewer-close">✕</button>
             </div>
           </div>
@@ -92,6 +101,13 @@ const DocsPanel = {
       .addEventListener("click", () => {
         DocsReviewer.analizarDocumento({ interactive: true });
       });
+  },
+
+  mostrarErrorExtensionRecargada() {
+    this.mostrarError(
+      DocsRuntime.INVALIDATED_CONTEXT_MESSAGE ||
+        "La extensión se actualizó. Recargá la página para continuar.",
+    );
   },
 
   actualizarIssues(allMatches) {

@@ -102,29 +102,30 @@ const DocsHighlighter = {
     }
 
     const generation = ++this._recalcGeneration;
+    let domIssueRects = null;
 
     // Try DOM approach first — works when accessibility mode is enabled in GDocs.
     const textRoot = this.getTextRoot();
     if (textRoot) {
       const textModel = this.buildTextModel(textRoot);
       if (textModel.normalizedText.length > 0) {
-        const issueRects = this.mapIssuesToRects(textModel);
-        const visibleIssues = Array.from(issueRects.values()).filter(
-          (rects) => rects.length > 0,
-        ).length;
+        domIssueRects = this.mapIssuesToRects(textModel);
+        const visibleIssues = this.countVisibleIssueRects(domIssueRects);
         console.log("[Legal Docs] Highlighter (DOM):", {
           root: textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
           modelLength: textModel.normalizedText.length,
           issues: this.issues.length,
           visibleIssues,
         });
-        if (visibleIssues > 0) {
-          if (generation === this._recalcGeneration) this.renderMarkers(issueRects);
+        if (visibleIssues === this.issues.length) {
+          if (generation === this._recalcGeneration) {
+            this.renderMarkers(domIssueRects);
+          }
           return;
         }
 
         console.log(
-          "[Legal Docs] Highlighter (DOM): no visible rects, trying canvas fallback",
+          "[Legal Docs] Highlighter (DOM): incomplete coverage, trying canvas fallback",
         );
       }
     }
@@ -135,19 +136,18 @@ const DocsHighlighter = {
 
     if (!canvasData.length) {
       console.log("[Legal Docs] Highlighter: no text root and no canvas fragments");
-      this.renderMarkers(new Map());
+      this.renderMarkers(domIssueRects || new Map());
       return;
     }
 
     const sortedFragments = this.buildSortedFragments(canvasData);
     const canvasTextModel = this.buildCanvasTextModel(sortedFragments);
-    const issueRects = this.mapIssuesToRectsFromCanvas(
+    const canvasIssueRects = this.mapIssuesToRectsFromCanvas(
       sortedFragments,
       canvasTextModel,
     );
-    const visibleIssues = Array.from(issueRects.values()).filter(
-      (rects) => rects.length > 0,
-    ).length;
+    const mergedIssueRects = this.mergeIssueRects(domIssueRects, canvasIssueRects);
+    const visibleIssues = this.countVisibleIssueRects(mergedIssueRects);
     console.log("[Legal Docs] Highlighter (canvas):", {
       canvases: canvasData.length,
       fragments: sortedFragments.length,
@@ -155,7 +155,9 @@ const DocsHighlighter = {
       issues: this.issues.length,
       visibleIssues,
     });
-    if (generation === this._recalcGeneration) this.renderMarkers(issueRects);
+    if (generation === this._recalcGeneration) {
+      this.renderMarkers(mergedIssueRects);
+    }
   },
 
   scheduleRecalculate() {
@@ -514,18 +516,19 @@ const DocsHighlighter = {
           return;
         }
 
-        startIndex = this.findBestNeedleMatch(
+        const fallbackRange = this.findBestNeedleRange(
           textModel.normalizedLower,
           normalizedNeedle,
           startIndex,
         );
-        if (startIndex === -1) {
+        if (!fallbackRange) {
           issue.rects = [];
           issue.isVisible = false;
           issueRects.set(issue.id, []);
           return;
         }
-        endIndex = startIndex + normalizedNeedle.length;
+        startIndex = fallbackRange.start;
+        endIndex = fallbackRange.end;
       }
 
       // At this point startIndex/endIndex are resolved; reject anything still negative.
@@ -547,17 +550,20 @@ const DocsHighlighter = {
 
       // If the range mapped by offsets produced no visible rects, retry by text.
       if (!rects.length && normalizedNeedle) {
-        const fallbackStart = this.findBestNeedleMatch(
+        const fallbackMatch = this.findBestNeedleRange(
           textModel.normalizedLower,
           normalizedNeedle,
           startIndex,
         );
 
-        if (fallbackStart !== -1 && fallbackStart !== startIndex) {
+        if (
+          fallbackMatch &&
+          (fallbackMatch.start !== startIndex || fallbackMatch.end !== endIndex)
+        ) {
           const fallbackRange = this.createRangeFromIndices(
             textModel.charMap,
-            fallbackStart,
-            fallbackStart + normalizedNeedle.length,
+            fallbackMatch.start,
+            fallbackMatch.end,
           );
           rects = fallbackRange
             ? this.normalizeRects(Array.from(fallbackRange.getClientRects()))
@@ -595,26 +601,15 @@ const DocsHighlighter = {
   findBestNeedleMatch(haystack, needle, preferredStart) {
     if (!needle || !haystack) return -1;
 
-    let directStart = 0;
-    if (Number.isInteger(preferredStart) && preferredStart >= 0) {
-      directStart = Math.max(0, preferredStart - 40);
-    }
-
-    const direct = haystack.indexOf(needle, directStart);
-    if (direct !== -1) {
-      return direct;
-    }
-
-    if (!Number.isInteger(preferredStart) || preferredStart < 0) {
-      return haystack.indexOf(needle);
-    }
-
     let bestIndex = -1;
     let bestDistance = Number.POSITIVE_INFINITY;
     let next = haystack.indexOf(needle);
 
     while (next !== -1) {
-      const distance = Math.abs(next - preferredStart);
+      const distance =
+        Number.isInteger(preferredStart) && preferredStart >= 0
+          ? Math.abs(next - preferredStart)
+          : next;
       if (distance < bestDistance) {
         bestDistance = distance;
         bestIndex = next;
@@ -623,6 +618,62 @@ const DocsHighlighter = {
     }
 
     return bestIndex;
+  },
+
+  findBestNeedleRange(haystack, needle, preferredStart) {
+    const exactStart = this.findBestNeedleMatch(
+      haystack,
+      needle,
+      preferredStart,
+    );
+
+    if (exactStart !== -1) {
+      return {
+        start: exactStart,
+        end: exactStart + needle.length,
+      };
+    }
+
+    return this.findFlexibleNeedleRange(haystack, needle, preferredStart);
+  },
+
+  findFlexibleNeedleRange(haystack, needle, preferredStart) {
+    if (!needle || !haystack) return null;
+
+    const tokens = needle.split(/\s+/).filter(Boolean);
+    if (tokens.length < 2) return null;
+
+    const escapedTokens = tokens.map((token) =>
+      token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    );
+    const separatorPattern = "[\\s.,;:!?\"'()\\[\\]{}-]*";
+    const regex = new RegExp(escapedTokens.join(separatorPattern), "g");
+
+    let bestMatch = null;
+    let match;
+
+    while ((match = regex.exec(haystack)) !== null) {
+      const candidate = {
+        start: match.index,
+        end: match.index + match[0].length,
+      };
+
+      if (
+        !bestMatch ||
+        !Number.isInteger(preferredStart) ||
+        preferredStart < 0 ||
+        Math.abs(candidate.start - preferredStart) <
+          Math.abs(bestMatch.start - preferredStart)
+      ) {
+        bestMatch = candidate;
+      }
+
+      if (match[0].length === 0) {
+        regex.lastIndex += 1;
+      }
+    }
+
+    return bestMatch;
   },
 
   createRangeFromIndices(charMap, startIndex, endIndex) {
@@ -661,8 +712,51 @@ const DocsHighlighter = {
       }));
   },
 
+  countVisibleIssueRects(issueRects) {
+    if (!(issueRects instanceof Map)) return 0;
+
+    let visibleCount = 0;
+    issueRects.forEach((rects) => {
+      if (Array.isArray(rects) && rects.length > 0) {
+        visibleCount += 1;
+      }
+    });
+    return visibleCount;
+  },
+
+  mergeIssueRects(primaryIssueRects, fallbackIssueRects) {
+    if (!(primaryIssueRects instanceof Map)) {
+      return fallbackIssueRects instanceof Map ? new Map(fallbackIssueRects) : new Map();
+    }
+
+    const merged = new Map(primaryIssueRects);
+
+    if (!(fallbackIssueRects instanceof Map)) {
+      return merged;
+    }
+
+    fallbackIssueRects.forEach((rects, issueId) => {
+      const existingRects = merged.get(issueId);
+      if (!Array.isArray(existingRects) || existingRects.length === 0) {
+        merged.set(issueId, Array.isArray(rects) ? rects : []);
+      }
+    });
+
+    return merged;
+  },
+
+  syncIssuesWithRects(issueRects) {
+    const rectsByIssue = issueRects instanceof Map ? issueRects : new Map();
+    this.issues.forEach((issue) => {
+      const rects = rectsByIssue.get(issue.id) || [];
+      issue.rects = rects;
+      issue.isVisible = rects.length > 0;
+    });
+  },
+
   renderMarkers(issueRects) {
     this.currentRects = issueRects;
+    this.syncIssuesWithRects(issueRects);
 
     this.issueMarkers.forEach((markers) => {
       markers.forEach((marker) => marker.remove());
@@ -1029,10 +1123,24 @@ const DocsHighlighter = {
   buildCanvasTextModel(sortedFragments) {
     const normalizedChars = [];
     const charMap = [];
-    let previousWasWhitespace = false;
+    let previousWasWhitespace = true; // start true to avoid leading space
+    let previousFragment = null;
 
     sortedFragments.forEach((frag, fragIndex) => {
       const text = frag.text || "";
+
+      if (
+        this.shouldInsertSyntheticFragmentSpace(
+          previousFragment,
+          frag,
+          previousWasWhitespace,
+        )
+      ) {
+        normalizedChars.push(" ");
+        charMap.push(null); // synthetic – no real canvas character position
+        previousWasWhitespace = true;
+      }
+
       for (let charOffset = 0; charOffset < text.length; charOffset += 1) {
         const char = text[charOffset];
         const isWhitespace = /\s/.test(char);
@@ -1050,6 +1158,10 @@ const DocsHighlighter = {
         charMap.push({ fragIndex, charOffset });
         previousWasWhitespace = false;
       }
+
+      if (text.length > 0) {
+        previousFragment = frag;
+      }
     });
 
     const normalizedText = normalizedChars.join("");
@@ -1058,6 +1170,125 @@ const DocsHighlighter = {
       normalizedLower: normalizedText.toLocaleLowerCase(),
       charMap,
     };
+  },
+
+  shouldInsertSyntheticFragmentSpace(previousFragment, currentFragment, previousWasWhitespace) {
+    if (
+      previousWasWhitespace ||
+      !previousFragment?.text ||
+      !currentFragment?.text ||
+      /^\s/.test(currentFragment.text)
+    ) {
+      return false;
+    }
+
+    const lineDelta = Math.abs(
+      (currentFragment.viewportBaselineY || 0) -
+        (previousFragment.viewportBaselineY || 0),
+    );
+    const lineThreshold = Math.max(
+      3,
+      this.estimateFragmentLineHeight(previousFragment) * 0.45,
+      this.estimateFragmentLineHeight(currentFragment) * 0.45,
+    );
+
+    if (lineDelta > lineThreshold) {
+      return true;
+    }
+
+    const previousBounds = this.getFragmentHorizontalBounds(previousFragment);
+    const currentBounds = this.getFragmentHorizontalBounds(currentFragment);
+    const gap = currentBounds.left - previousBounds.right;
+
+    if (gap <= 1) {
+      return false;
+    }
+
+    const spaceWidth = Math.max(
+      this.measureTextWidth(" ", previousFragment.font) *
+        (previousFragment.viewportScaleX || 1),
+      this.measureTextWidth(" ", currentFragment.font) *
+        (currentFragment.viewportScaleX || 1),
+      3,
+    );
+
+    return gap >= spaceWidth * 0.45;
+  },
+
+  estimateFragmentLineHeight(frag) {
+    const fontMatch = String(frag?.font || "").match(/(\d+(?:\.\d+)?)px/);
+    const fontSize = fontMatch ? Number(fontMatch[1]) : 16;
+    return fontSize * (frag?.viewportScaleY || 1);
+  },
+
+  getMeasureContext() {
+    if (!this._measureCanvas) {
+      this._measureCanvas = document.createElement("canvas");
+    }
+
+    return this._measureCanvas.getContext("2d");
+  },
+
+  measureTextWidth(text, font) {
+    const ctx = this.getMeasureContext();
+    ctx.font = font || ctx.font;
+    return ctx.measureText(text || "").width;
+  },
+
+  getFragmentHorizontalBounds(frag) {
+    const width =
+      this.measureTextWidth(frag?.text || "", frag?.font) *
+      (frag?.viewportScaleX || 1);
+    let left = frag?.viewportBaselineX || 0;
+    let right = left + width;
+
+    if (frag?.textAlign === "center") {
+      left -= width / 2;
+      right -= width / 2;
+    } else if (frag?.textAlign === "right" || frag?.textAlign === "end") {
+      left -= width;
+      right -= width;
+    }
+
+    return { left, right };
+  },
+
+  getFragmentVerticalBounds(frag, metrics) {
+    const lineHeight = Math.max(this.estimateFragmentLineHeight(frag), 1);
+    const ascent =
+      (metrics?.actualBoundingBoxAscent || lineHeight * 0.8) *
+      (frag?.viewportScaleY || 1);
+    const descent =
+      (metrics?.actualBoundingBoxDescent || lineHeight * 0.2) *
+      (frag?.viewportScaleY || 1);
+    const totalHeight = Math.max(lineHeight, ascent + descent);
+    const anchorY = frag?.viewportBaselineY || 0;
+
+    switch (frag?.textBaseline) {
+      case "top":
+      case "hanging":
+        return {
+          top: anchorY,
+          bottom: anchorY + totalHeight,
+        };
+      case "middle":
+        return {
+          top: anchorY - totalHeight / 2,
+          bottom: anchorY + totalHeight / 2,
+        };
+      case "bottom":
+      case "ideographic":
+        return {
+          top: anchorY - totalHeight,
+          bottom: anchorY,
+        };
+      case "alphabetic":
+      default:
+        return {
+          top: anchorY - ascent,
+          bottom: anchorY + descent,
+        };
+    }
   },
 
   mapIssuesToRectsFromCanvas(sortedFragments, canvasTextModel) {
@@ -1092,18 +1323,18 @@ const DocsHighlighter = {
       }
 
       if (!rects.length && normalizedNeedle) {
-        const fallbackStart = this.findBestNeedleMatch(
+        const fallbackMatch = this.findBestNeedleRange(
           canvasTextModel.normalizedLower,
           normalizedNeedle,
           startIndex,
         );
 
-        if (fallbackStart !== -1) {
+        if (fallbackMatch) {
           rects = this.computeRectsFromCanvasIndices(
             sortedFragments,
             canvasTextModel.charMap,
-            fallbackStart,
-            fallbackStart + normalizedNeedle.length,
+            fallbackMatch.start,
+            fallbackMatch.end,
           );
         }
       }
@@ -1148,10 +1379,7 @@ const DocsHighlighter = {
   },
 
   computeFragmentPortionRect(frag, startChar, endChar) {
-    if (!this._measureCanvas) {
-      this._measureCanvas = document.createElement("canvas");
-    }
-    const ctx = this._measureCanvas.getContext("2d");
+    const ctx = this.getMeasureContext();
     ctx.font = frag.font;
 
     const prefix = frag.text.substring(0, startChar);
@@ -1161,11 +1389,7 @@ const DocsHighlighter = {
     const prefixWidth = ctx.measureText(prefix).width;
     const selMetrics = ctx.measureText(selected);
     const selWidth = selMetrics.width;
-    // Metrics are in the canvas user-space units used by fillText().
-    const ascent = selMetrics.actualBoundingBoxAscent || 10;
-    const descent = selMetrics.actualBoundingBoxDescent || 3;
     const scaleX = frag.viewportScaleX || 1;
-    const scaleY = frag.viewportScaleY || 1;
 
     let left = frag.viewportBaselineX + prefixWidth * scaleX;
     let right = left + selWidth * scaleX;
@@ -1180,8 +1404,9 @@ const DocsHighlighter = {
       right -= fullWidth;
     }
 
-    const top = frag.viewportBaselineY - ascent * scaleY;
-    const bottom = frag.viewportBaselineY + descent * scaleY;
+    const verticalBounds = this.getFragmentVerticalBounds(frag, selMetrics);
+    const top = verticalBounds.top;
+    const bottom = verticalBounds.bottom;
 
     if (right - left < 1 || bottom - top < 1) return null;
     return { left, top, right, bottom, width: right - left, height: bottom - top };

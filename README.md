@@ -4,7 +4,7 @@ Una extensión de Chrome que se enfoca en reglas de escritura jurídica en el ma
 
 Revisa y mejora la escritura en Google Docs, detectando problemas de estilo y sugiriendo mejoras. Es similar a Grammarly, ProWritingAid o Hemingway App pero pensada para profesionales del derecho.
 
-No envía datos a servidores externos, funciona 100% en el navegador, y es de código abierto. Por esto, se puede trabajar en documentos sensibles sin preocupaciones de privacidad.
+No envía datos a servidores externos, ni usa modelos de IA. Funciona 100% en el navegador, y es de código abierto. Por esto, se puede trabajar en documentos sensibles sin preocupaciones de privacidad.
 
 ## Características
 

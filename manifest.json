@@ -58,6 +58,7 @@
         "rules/arcaismos.js",
         "rules/voz-pasiva.js",
         "rules/queismo.js",
+        "content/runtime.js",
         "content/reader.js",
         "content/highlighter.js",
         "content/panel.js",

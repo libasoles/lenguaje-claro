@@ -10,7 +10,9 @@ async function launchBrowserOrSkip(t) {
   try {
     return await chromium.launch({ headless: true });
   } catch (error) {
-    t.skip(`Playwright no disponible en este entorno: ${error.message.split("\n")[0]}`);
+    t.skip(
+      `Playwright no disponible en este entorno: ${error.message.split("\n")[0]}`,
+    );
     return null;
   }
 }
@@ -36,10 +38,12 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     "Hay que darse cuenta que esto importa.",
   ].join(" ");
 
-  await page.route("https://docs.google.com/document/d/test-doc", async (route) => {
-    await route.fulfill({
-      contentType: "text/html; charset=utf-8",
-      body: `<!doctype html>
+  await page.route(
+    "https://docs.google.com/document/d/test-doc",
+    async (route) => {
+      await route.fulfill({
+        contentType: "text/html; charset=utf-8",
+        body: `<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
@@ -75,8 +79,9 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     </main>
   </body>
 </html>`,
-    });
-  });
+      });
+    },
+  );
 
   await page.addInitScript((docText) => {
     const buildSegments = (text) => [
@@ -92,7 +97,19 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
       docText,
       readCalls: 0,
       sentMessages: [],
+      failNextReadWithInvalidatedContext: false,
+      unhandledErrors: [],
+      unhandledRejections: [],
     };
+
+    window.addEventListener("error", (event) => {
+      window.__docsReviewerTestState.unhandledErrors.push(event.message);
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+      window.__docsReviewerTestState.unhandledRejections.push(
+        event.reason?.message || String(event.reason),
+      );
+    });
 
     window.chrome = {
       runtime: {
@@ -128,7 +145,9 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     var DocsReader = (window.DocsReader = {
       lastReadError: null,
       getDocumentId() {
-        const match = window.location.href.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+        const match = window.location.href.match(
+          /\/document\/d\/([a-zA-Z0-9_-]+)/,
+        );
         return match ? match[1] : null;
       },
       esperarDocumentoListo() {
@@ -136,6 +155,18 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
       },
       leerDocumento() {
         window.__docsReviewerTestState.readCalls += 1;
+
+        if (window.__docsReviewerTestState.failNextReadWithInvalidatedContext) {
+          window.__docsReviewerTestState.failNextReadWithInvalidatedContext = false;
+          this.lastReadError = {
+            code: "EXTENSION_CONTEXT_INVALIDATED",
+            message:
+              "La extensión se actualizó. Recargá la página para continuar.",
+          };
+          return Promise.resolve(null);
+        }
+
+        this.lastReadError = null;
         return Promise.resolve({
           text: window.__docsReviewerTestState.docText,
           segments: buildSegments(window.__docsReviewerTestState.docText),
@@ -171,11 +202,21 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
   }, sampleDocText);
 
   await page.goto("https://docs.google.com/document/d/test-doc");
-  await page.addStyleTag({ path: path.join(projectRoot, "panel", "panel.css") });
-  await page.addScriptTag({ path: path.join(projectRoot, "rules", "index.js") });
-  await page.addScriptTag({ path: path.join(projectRoot, "rules", "arcaismos.js") });
-  await page.addScriptTag({ path: path.join(projectRoot, "rules", "voz-pasiva.js") });
-  await page.addScriptTag({ path: path.join(projectRoot, "rules", "queismo.js") });
+  await page.addStyleTag({
+    path: path.join(projectRoot, "panel", "panel.css"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "rules", "index.js"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "rules", "arcaismos.js"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "rules", "voz-pasiva.js"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "rules", "queismo.js"),
+  });
   await page.evaluate((nextPatterns) => {
     const rule = window.docsReviewerRules.find((item) => item.id === "queismo");
     rule._patterns = nextPatterns;
@@ -183,8 +224,15 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     rule.getNlpEngine = () => null;
     rule._engineName = "fallback";
   }, patterns);
-  await page.addScriptTag({ path: path.join(projectRoot, "content", "panel.js") });
-  await page.addScriptTag({ path: path.join(projectRoot, "content", "content.js") });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "content", "runtime.js"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "content", "panel.js"),
+  });
+  await page.addScriptTag({
+    path: path.join(projectRoot, "content", "content.js"),
+  });
 
   await page.waitForFunction(
     () => document.querySelectorAll(".docs-reviewer-issue").length === 3,
@@ -192,20 +240,28 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
 
   const initialState = await page.evaluate(() => {
     const panel = document.getElementById("docs-reviewer-panel");
-    const issues = Array.from(document.querySelectorAll(".docs-reviewer-issue")).map(
-      (element) => ({
-        rule: element.querySelector(".docs-reviewer-issue-regla")?.textContent?.trim(),
-        description: element.querySelector(".docs-reviewer-issue-texto")?.textContent?.trim(),
-        suggestion: element
-          .querySelector(".docs-reviewer-issue-sugerencia")
-          ?.textContent?.trim(),
-        button: element.querySelector(".docs-reviewer-issue-button")?.textContent?.trim(),
-      }),
-    );
+    const issues = Array.from(
+      document.querySelectorAll(".docs-reviewer-issue"),
+    ).map((element) => ({
+      rule: element
+        .querySelector(".docs-reviewer-issue-regla")
+        ?.textContent?.trim(),
+      description: element
+        .querySelector(".docs-reviewer-issue-texto")
+        ?.textContent?.trim(),
+      suggestion: element
+        .querySelector(".docs-reviewer-issue-sugerencia")
+        ?.textContent?.trim(),
+      button: element
+        .querySelector(".docs-reviewer-issue-button")
+        ?.textContent?.trim(),
+    }));
 
     return {
       panelExists: Boolean(panel),
-      panelVisible: panel ? window.getComputedStyle(panel).display !== "none" : false,
+      panelVisible: panel
+        ? window.getComputedStyle(panel).display !== "none"
+        : false,
       headerButtons: {
         reanalyze: Boolean(document.getElementById("docs-reviewer-reanalizar")),
         close: Boolean(document.getElementById("docs-reviewer-close")),
@@ -219,14 +275,20 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
 
   assert.equal(initialState.panelExists, true);
   assert.equal(initialState.panelVisible, true);
-  assert.deepEqual(initialState.headerButtons, { reanalyze: true, close: true });
+  assert.deepEqual(initialState.headerButtons, {
+    reanalyze: true,
+    close: true,
+  });
   assert.equal(initialState.issueCount, 3);
   assert.deepEqual(
     initialState.issues.map((issue) => issue.rule),
     ["Arcaísmo innecesario", "Voz pasiva", "Queismo y dequeismo"],
   );
   assert.match(initialState.issues[0].suggestion, /al final/i);
-  assert.match(initialState.issues[1].suggestion, /La actora interpuso el recurso/i);
+  assert.match(
+    initialState.issues[1].suggestion,
+    /La actora interpuso el recurso/i,
+  );
   assert.match(initialState.issues[2].suggestion, /Posible queismo/i);
   assert.deepEqual(
     initialState.issues.map((issue) => issue.button),
@@ -239,10 +301,14 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     () => window.__docsReviewerTestState.readCalls === 2,
   );
 
-  await page.locator(".docs-reviewer-issue-button", { hasText: "Ver en documento" }).first().click();
+  await page
+    .locator(".docs-reviewer-issue-button", { hasText: "Ver en documento" })
+    .first()
+    .click();
 
   const finalState = await page.evaluate(() => ({
-    activeIssueCount: document.querySelectorAll(".docs-reviewer-issue-active").length,
+    activeIssueCount: document.querySelectorAll(".docs-reviewer-issue-active")
+      .length,
     activeIssueButtonText: document
       .querySelector(".docs-reviewer-issue-active .docs-reviewer-issue-button")
       ?.textContent?.trim(),
@@ -250,4 +316,30 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
 
   assert.equal(finalState.activeIssueCount, 1);
   assert.equal(finalState.activeIssueButtonText, "Ver en documento");
+
+  await page.evaluate(() => {
+    window.__docsReviewerTestState.failNextReadWithInvalidatedContext = true;
+  });
+  await page.getByRole("button", { name: "↺" }).click();
+  await page.waitForFunction(() =>
+    document
+      .querySelector(".docs-reviewer-placeholder.docs-reviewer-error")
+      ?.textContent?.includes("La extensión se actualizó o recargó."),
+  );
+
+  const invalidatedState = await page.evaluate(() => ({
+    errorMessage: document
+      .querySelector(".docs-reviewer-placeholder.docs-reviewer-error")
+      ?.textContent?.trim(),
+    unhandledErrors: window.__docsReviewerTestState.unhandledErrors.slice(),
+    unhandledRejections:
+      window.__docsReviewerTestState.unhandledRejections.slice(),
+  }));
+
+  assert.match(
+    invalidatedState.errorMessage,
+    /La extensión se actualizó o recargó\./i,
+  );
+  assert.deepEqual(invalidatedState.unhandledErrors, []);
+  assert.deepEqual(invalidatedState.unhandledRejections, []);
 });
