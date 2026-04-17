@@ -1,5 +1,6 @@
 import { DocsPanel } from "./panel.js";
 import { getReviewerActions } from "./reviewer-actions.js";
+import { mantenerCase } from "../rules/shared.js";
 
 export const DocsHighlighter = {
   overlayElement: null,
@@ -958,12 +959,12 @@ export const DocsHighlighter = {
     let actionsHTML = "";
     if (!isHintOnly && hasMultipleSugerencias) {
       const buttons = issue.sugerencias
-        .map(
-          (s) =>
-            `<button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply" data-sugerencia="${this.escapeHTML(s)}">Aplicar: ${this.escapeHTML(s)}</button>`,
-        )
+        .map((s) => {
+          const display = mantenerCase(issue.textoOriginal, s);
+          return `<button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-suggestion" data-action="apply" data-sugerencia="${this.escapeHTML(s)}">${this.escapeHTML(display)}</button>`;
+        })
         .join("");
-      actionsHTML = `<div class="docs-reviewer-popup-actions docs-reviewer-popup-actions-multi">${buttons}</div>`;
+      actionsHTML = `<div class="docs-reviewer-popup-actions docs-reviewer-popup-actions-multi"><span class="docs-reviewer-popup-actions-label">Sugerencias</span>${buttons}</div>`;
     } else if (!isHintOnly && canApply) {
       actionsHTML = `
       <div class="docs-reviewer-popup-actions">
@@ -977,7 +978,6 @@ export const DocsHighlighter = {
         <button type="button" class="docs-reviewer-popup-close" aria-label="Cerrar">✕</button>
       </div>
       <div class="docs-reviewer-popup-body">
-        <div class="docs-reviewer-popup-description">${safeDescription}</div>
         <div class="docs-reviewer-popup-original">${safeOriginal}</div>
         ${suggestionHTML}
       </div>

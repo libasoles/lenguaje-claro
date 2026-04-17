@@ -543,6 +543,7 @@
 
 .docs-reviewer-popup-actions-multi {
   flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 .docs-reviewer-popup-actions-multi .docs-reviewer-popup-button {
@@ -574,6 +575,28 @@
 
 .docs-reviewer-popup-button-primary:hover {
   background: #1557b0;
+}
+
+.docs-reviewer-popup-actions-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 6px;
+  margin-bottom: 0px;
+  width: 100%;
+}
+
+.docs-reviewer-popup-button-suggestion {
+  background: #e6f4ea;
+  border-color: #34a853;
+  color: #1e7e34;
+}
+
+.docs-reviewer-popup-button-suggestion:hover {
+  background: #ceead6;
 }
 
 .docs-reviewer-popup-footer {
