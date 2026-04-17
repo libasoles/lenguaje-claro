@@ -3,18 +3,11 @@
   "name": "Lenguaje claro",
   "version": "0.1.0",
   "description": "Revisa y mejora la escritura en Google Docs - Detecta arcaísmos, voz pasiva y queísmo",
-  "permissions": [
-    "storage",
-    "identity"
-  ],
-  "host_permissions": [
-    "https://docs.googleapis.com/*"
-  ],
+  "permissions": ["storage", "identity"],
+  "host_permissions": ["https://docs.googleapis.com/*"],
   "oauth2": {
     "client_id": "859241459252-kmb72v67hoep1i0467rvg52tae3o6e1p.apps.googleusercontent.com",
-    "scopes": [
-      "https://www.googleapis.com/auth/documents"
-    ]
+    "scopes": ["https://www.googleapis.com/auth/documents"]
   },
   "background": {
     "service_worker": "background.js"
@@ -27,37 +20,26 @@
   },
   "web_accessible_resources": [
     {
-      "resources": [
-        "assets/icons/*",
-        "rules/patterns.json"
-      ],
-      "matches": [
-        "https://docs.google.com/*"
-      ]
+      "resources": ["assets/icons/*", "rules/patterns.json"],
+      "matches": ["https://docs.google.com/*"]
     }
   ],
   "content_scripts": [
     {
-      "matches": [
-        "https://docs.google.com/*"
-      ],
-      "js": [
-        "content/canvas-patcher.js",
-        "content/kix-bridge.js"
-      ],
+      "matches": ["https://docs.google.com/*"],
+      "js": ["content/canvas-patcher.js", "content/kix-bridge.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": [
-        "https://docs.google.com/*"
-      ],
+      "matches": ["https://docs.google.com/*"],
       "js": [
         "vendor/compromise.min.js",
         "vendor/es-compromise.min.js",
         "rules/index.js",
         "rules/arcaismos.js",
         "rules/tecnicismos.js",
+        "rules/vaguedades.js",
         "rules/voz-pasiva.js",
         "rules/queismo.js",
         "content/runtime.js",
@@ -67,9 +49,7 @@
         "content/panel.js",
         "content/content.js"
       ],
-      "css": [
-        "panel/panel.css"
-      ],
+      "css": ["panel/panel.css"],
       "run_at": "document_idle"
     }
   ]

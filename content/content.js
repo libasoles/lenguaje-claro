@@ -54,7 +54,9 @@ const DocsReviewer = {
         match.fin,
       );
 
-      console.log(`[Legal Docs] Match ${match.regla}: inicio=${match.inicio}, fin=${match.fin}, normalized=${JSON.stringify(normalizedRange)}, text="${match.textoOriginal}"`);
+      console.log(
+        `[Legal Docs] Match ${match.regla}: inicio=${match.inicio}, fin=${match.fin}, normalized=${JSON.stringify(normalizedRange)}, text="${match.textoOriginal}"`,
+      );
 
       return {
         ...match,
@@ -134,7 +136,9 @@ const DocsReviewer = {
           return;
         }
 
-        DocsPanel.mostrarError(readError?.message || "Sin acceso al documento.");
+        DocsPanel.mostrarError(
+          readError?.message || "Sin acceso al documento.",
+        );
         return;
       }
 
@@ -165,10 +169,12 @@ const DocsReviewer = {
         console.warn("[Legal Docs] No hay reglas disponibles");
       }
 
-      this.allMatches = this.enriquecerMatches(collectedMatches).sort((a, b) => {
-        if (a.inicio !== b.inicio) return a.inicio - b.inicio;
-        return a.fin - b.fin;
-      });
+      this.allMatches = this.enriquecerMatches(collectedMatches).sort(
+        (a, b) => {
+          if (a.inicio !== b.inicio) return a.inicio - b.inicio;
+          return a.fin - b.fin;
+        },
+      );
       this.issuesById = new Map(
         this.allMatches.map((issue) => [issue.id, issue]),
       );
@@ -291,7 +297,8 @@ const DocsReviewer = {
 
         console.error("[Legal Docs] Error de API:", response?.error);
         alert(
-          "Error al aplicar la corrección: " + (response?.error || "desconocido"),
+          "Error al aplicar la corrección: " +
+            (response?.error || "desconocido"),
         );
       } catch (error) {
         if (this.esContextoExtensionInvalidado(error)) {
@@ -312,20 +319,24 @@ const DocsReviewer = {
   },
 
   inicializarUndo() {
-    document.addEventListener("keydown", (event) => {
-      const isUndoShortcut =
-        (event.ctrlKey || event.metaKey) &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "z";
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        const isUndoShortcut =
+          (event.ctrlKey || event.metaKey) &&
+          !event.shiftKey &&
+          event.key.toLowerCase() === "z";
 
-      if (!isUndoShortcut || !this.undoStack.length || this.isUndoInFlight) {
-        return;
-      }
+        if (!isUndoShortcut || !this.undoStack.length || this.isUndoInFlight) {
+          return;
+        }
 
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      void this.deshacerUltimoCambio();
-    }, true);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void this.deshacerUltimoCambio();
+      },
+      true,
+    );
   },
 
   async deshacerUltimoCambio() {
@@ -340,7 +351,9 @@ const DocsReviewer = {
     try {
       const documento = await DocsReader.leerDocumento({ interactive: true });
       if (!documento?.text) {
-        if (DocsReader.lastReadError?.code === "EXTENSION_CONTEXT_INVALIDATED") {
+        if (
+          DocsReader.lastReadError?.code === "EXTENSION_CONTEXT_INVALIDATED"
+        ) {
           this.manejarContextoExtensionInvalidado(DocsReader.lastReadError);
           return;
         }

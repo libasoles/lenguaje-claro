@@ -167,16 +167,21 @@ const DocsPanel = {
           Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
         const canApplyFromPanel =
           issue.sugerencia &&
+          issue.aplicable !== false &&
           !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
 
-        if (
-          canApplyFromPanel &&
-          !hasMultipleSugerencias
-        ) {
-          const suggestionElement = document.createElement("div");
-          suggestionElement.className = "docs-reviewer-issue-sugerencia";
-          suggestionElement.innerHTML = `<strong>Sugerencia:</strong> ${issue.sugerencia}`;
-          issueDiv.appendChild(suggestionElement);
+        if (!hasMultipleSugerencias && issue.sugerencia) {
+          if (canApplyFromPanel) {
+            const suggestionElement = document.createElement("div");
+            suggestionElement.className = "docs-reviewer-issue-sugerencia";
+            suggestionElement.innerHTML = `<strong>Sugerencia:</strong> ${issue.sugerencia}`;
+            issueDiv.appendChild(suggestionElement);
+          } else if (issue.aplicable === false) {
+            const hintElement = document.createElement("div");
+            hintElement.className = "docs-reviewer-issue-hint";
+            hintElement.innerHTML = `<strong>Sugerencia:</strong> ${issue.sugerencia}`;
+            issueDiv.appendChild(hintElement);
+          }
         }
 
         if (hasMultipleSugerencias) {
@@ -184,7 +189,8 @@ const DocsPanel = {
           buttonGroup.className = "docs-reviewer-issue-button-group";
           issue.sugerencias.forEach((s) => {
             const btn = document.createElement("button");
-            btn.className = "docs-reviewer-issue-button docs-reviewer-issue-button-option";
+            btn.className =
+              "docs-reviewer-issue-button docs-reviewer-issue-button-option";
             btn.textContent = s;
             btn.addEventListener("click", (event) => {
               event.stopPropagation();
@@ -193,7 +199,7 @@ const DocsPanel = {
             buttonGroup.appendChild(btn);
           });
           issueDiv.appendChild(buttonGroup);
-        } else {
+        } else if (issue.aplicable !== false) {
           const buttonElement = document.createElement("button");
           buttonElement.className = "docs-reviewer-issue-button";
           buttonElement.textContent = canApplyFromPanel

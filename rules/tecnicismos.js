@@ -61,7 +61,9 @@ const tecnicismosRule = {
     return Array.from(text)
       .map((char) => {
         const lowerChar = this.normalizeAccentChar(char).toLocaleLowerCase();
-        return this.accentInsensitiveMap[lowerChar] || this.escapeRegexChar(char);
+        return (
+          this.accentInsensitiveMap[lowerChar] || this.escapeRegexChar(char)
+        );
       })
       .join("");
   },
@@ -104,9 +106,9 @@ const tecnicismosRule = {
 
     if (
       this.getWordCaseStyle(originalWords[0]) === "capitalized" &&
-      originalWords.slice(1).every(
-        (word) => this.getWordCaseStyle(word) === "lower",
-      )
+      originalWords
+        .slice(1)
+        .every((word) => this.getWordCaseStyle(word) === "lower")
     ) {
       return (
         sugerencia.charAt(0).toLocaleUpperCase() +
@@ -167,12 +169,18 @@ const tecnicismosRule = {
     },
     {
       original: "acreedor",
-      sugerencias: ["quien presta el dinero", "quien tiene el derecho a cobrar"],
+      sugerencias: [
+        "quien presta el dinero",
+        "quien tiene el derecho a cobrar",
+      ],
       palabrasClaves: "acreedor",
     },
     {
       original: "deudor",
-      sugerencias: ["quien debe el dinero", "quien tiene la obligación de pagar"],
+      sugerencias: [
+        "quien debe el dinero",
+        "quien tiene la obligación de pagar",
+      ],
       palabrasClaves: "deudor",
     },
     {

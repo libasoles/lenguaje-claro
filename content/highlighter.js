@@ -64,7 +64,9 @@ const DocsHighlighter = {
     // Esperar a que el textRoot esté disponible
     const textRoot = await this.waitForTextRoot();
     if (!textRoot) {
-      console.log("[Legal Docs] aplicarHighlights: Could not find text root, will retry on mutation");
+      console.log(
+        "[Legal Docs] aplicarHighlights: Could not find text root, will retry on mutation",
+      );
     }
 
     this.scheduleRecalculate();
@@ -112,7 +114,10 @@ const DocsHighlighter = {
         domIssueRects = this.mapIssuesToRects(textModel);
         const visibleIssues = this.countVisibleIssueRects(domIssueRects);
         console.log("[Legal Docs] Highlighter (DOM):", {
-          root: textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
+          root:
+            textRoot.getAttribute("role") ||
+            textRoot.className ||
+            textRoot.tagName,
           modelLength: textModel.normalizedText.length,
           issues: this.issues.length,
           visibleIssues,
@@ -135,7 +140,9 @@ const DocsHighlighter = {
     if (generation !== this._recalcGeneration) return;
 
     if (!canvasData.length) {
-      console.log("[Legal Docs] Highlighter: no text root and no canvas fragments");
+      console.log(
+        "[Legal Docs] Highlighter: no text root and no canvas fragments",
+      );
       this.renderMarkers(domIssueRects || new Map());
       return;
     }
@@ -146,7 +153,10 @@ const DocsHighlighter = {
       sortedFragments,
       canvasTextModel,
     );
-    const mergedIssueRects = this.mergeIssueRects(domIssueRects, canvasIssueRects);
+    const mergedIssueRects = this.mergeIssueRects(
+      domIssueRects,
+      canvasIssueRects,
+    );
     const visibleIssues = this.countVisibleIssueRects(mergedIssueRects);
     console.log("[Legal Docs] Highlighter (canvas):", {
       canvases: canvasData.length,
@@ -229,13 +239,17 @@ const DocsHighlighter = {
       const check = () => {
         const root = this.getTextRootSync();
         if (root) {
-          console.log(`[Legal Docs] waitForTextRoot: Found after ${Date.now() - startTime}ms`);
+          console.log(
+            `[Legal Docs] waitForTextRoot: Found after ${Date.now() - startTime}ms`,
+          );
           resolve(root);
           return;
         }
 
         if (Date.now() - startTime > timeout) {
-          console.log(`[Legal Docs] waitForTextRoot: Timeout after ${timeout}ms`);
+          console.log(
+            `[Legal Docs] waitForTextRoot: Timeout after ${timeout}ms`,
+          );
           resolve(null);
           return;
         }
@@ -255,9 +269,9 @@ const DocsHighlighter = {
     // Try to find document content, not UI elements
     const candidates = [
       // Prioritize document stream view (actual content)
-      '.kix-appview-editor .kix-appview-edit-container',
+      ".kix-appview-editor .kix-appview-edit-container",
       '[role="main"] .kix-appview-edit-container',
-      '.kix-appview-edit-container',
+      ".kix-appview-edit-container",
       '[role="list"].docos-stream-view',
       ".docos-stream-view",
       '[role="region"][aria-label*="ocument"]',
@@ -273,7 +287,9 @@ const DocsHighlighter = {
       const elements = Array.from(document.querySelectorAll(selector));
       for (const element of elements) {
         if (this.hasVisibleText(element)) {
-          console.log(`[Legal Docs] Found text root with selector: ${selector}`);
+          console.log(
+            `[Legal Docs] Found text root with selector: ${selector}`,
+          );
           return element;
         }
       }
@@ -337,7 +353,10 @@ const DocsHighlighter = {
       const hasTextChange = mutations.some((mutation) => {
         if (mutation.type === "characterData") return true;
         if (mutation.type === "childList") {
-          for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
+          for (const node of [
+            ...mutation.addedNodes,
+            ...mutation.removedNodes,
+          ]) {
             if (node.nodeType === Node.TEXT_NODE) return true;
             if (
               node.nodeType === Node.ELEMENT_NODE &&
@@ -726,7 +745,9 @@ const DocsHighlighter = {
 
   mergeIssueRects(primaryIssueRects, fallbackIssueRects) {
     if (!(primaryIssueRects instanceof Map)) {
-      return fallbackIssueRects instanceof Map ? new Map(fallbackIssueRects) : new Map();
+      return fallbackIssueRects instanceof Map
+        ? new Map(fallbackIssueRects)
+        : new Map();
     }
 
     const merged = new Map(primaryIssueRects);
@@ -910,19 +931,24 @@ const DocsHighlighter = {
     ];
     const hasMultipleSugerencias =
       Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
+    const isHintOnly = issue.aplicable === false;
     const canApply =
-      issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
+      !isHintOnly &&
+      issue.sugerencia &&
+      !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
     const safeRuleName = this.escapeHTML(issue.reglaNombre);
     const safeDescription = this.escapeHTML(issue.descripcion);
     const safeOriginal = this.escapeHTML(issue.textoOriginal);
     const suggestionHTML =
-      canApply && !hasMultipleSugerencias
-        ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
-        : "";
+      isHintOnly && issue.sugerencia
+        ? `<div class="docs-reviewer-popup-hint"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
+        : canApply && !hasMultipleSugerencias
+          ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
+          : "";
     const logoUrl = chrome.runtime.getURL("assets/icons/logo.png");
 
     let actionsHTML = "";
-    if (hasMultipleSugerencias) {
+    if (!isHintOnly && hasMultipleSugerencias) {
       const buttons = issue.sugerencias
         .map(
           (s) =>
@@ -930,7 +956,7 @@ const DocsHighlighter = {
         )
         .join("");
       actionsHTML = `<div class="docs-reviewer-popup-actions docs-reviewer-popup-actions-multi">${buttons}</div>`;
-    } else if (canApply) {
+    } else if (!isHintOnly && canApply) {
       actionsHTML = `
       <div class="docs-reviewer-popup-actions">
         <button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>
@@ -1108,8 +1134,10 @@ const DocsHighlighter = {
           e: 0,
           f: 0,
         };
-        const baselineBitmapX = matrix.a * frag.x + matrix.c * frag.y + matrix.e;
-        const baselineBitmapY = matrix.b * frag.x + matrix.d * frag.y + matrix.f;
+        const baselineBitmapX =
+          matrix.a * frag.x + matrix.c * frag.y + matrix.e;
+        const baselineBitmapY =
+          matrix.b * frag.x + matrix.d * frag.y + matrix.f;
         const scaleX =
           Math.hypot(matrix.a, matrix.b) * bitmapToViewportScaleX || 1;
         const scaleY =
@@ -1195,7 +1223,11 @@ const DocsHighlighter = {
     };
   },
 
-  shouldInsertSyntheticFragmentSpace(previousFragment, currentFragment, previousWasWhitespace) {
+  shouldInsertSyntheticFragmentSpace(
+    previousFragment,
+    currentFragment,
+    previousWasWhitespace,
+  ) {
     if (
       previousWasWhitespace ||
       !previousFragment?.text ||
@@ -1369,7 +1401,12 @@ const DocsHighlighter = {
     return issueRects;
   },
 
-  computeRectsFromCanvasIndices(sortedFragments, charMap, startIndex, endIndex) {
+  computeRectsFromCanvasIndices(
+    sortedFragments,
+    charMap,
+    startIndex,
+    endIndex,
+  ) {
     if (!Array.isArray(charMap) || startIndex < 0 || endIndex <= startIndex) {
       return [];
     }
@@ -1432,7 +1469,14 @@ const DocsHighlighter = {
     const bottom = verticalBounds.bottom;
 
     if (right - left < 1 || bottom - top < 1) return null;
-    return { left, top, right, bottom, width: right - left, height: bottom - top };
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: right - left,
+      height: bottom - top,
+    };
   },
 
   // ── End canvas-based highlighting ──────────────────────────────────────────
