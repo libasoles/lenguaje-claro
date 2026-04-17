@@ -908,17 +908,34 @@ const DocsHighlighter = {
       "(simplifica dividiendo en múltiples oraciones)",
       "(considera usar voz activa)",
     ];
-    const canApply = issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
+    const hasMultipleSugerencias =
+      Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
+    const canApply =
+      issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
     const safeRuleName = this.escapeHTML(issue.reglaNombre);
     const safeDescription = this.escapeHTML(issue.descripcion);
     const safeOriginal = this.escapeHTML(issue.textoOriginal);
     const suggestionHTML =
-      issue.sugerencia &&
-      issue.sugerencia !== "(simplifica dividiendo en múltiples oraciones)" &&
-      issue.sugerencia !== "(considera usar voz activa)"
+      canApply && !hasMultipleSugerencias
         ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
         : "";
     const logoUrl = chrome.runtime.getURL("assets/icons/logo.png");
+
+    let actionsHTML = "";
+    if (hasMultipleSugerencias) {
+      const buttons = issue.sugerencias
+        .map(
+          (s) =>
+            `<button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply" data-sugerencia="${this.escapeHTML(s)}">Aplicar: ${this.escapeHTML(s)}</button>`,
+        )
+        .join("");
+      actionsHTML = `<div class="docs-reviewer-popup-actions docs-reviewer-popup-actions-multi">${buttons}</div>`;
+    } else if (canApply) {
+      actionsHTML = `
+      <div class="docs-reviewer-popup-actions">
+        <button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>
+      </div>`;
+    }
 
     return `
       <div class="docs-reviewer-popup-header">
@@ -930,10 +947,7 @@ const DocsHighlighter = {
         <div class="docs-reviewer-popup-original">${safeOriginal}</div>
         ${suggestionHTML}
       </div>
-      ${canApply ? `
-      <div class="docs-reviewer-popup-actions">
-        <button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>
-      </div>` : ""}
+      ${actionsHTML}
       <div class="docs-reviewer-popup-footer">
         <img src="${logoUrl}" class="docs-reviewer-popup-logo" alt="">
         <button type="button" class="docs-reviewer-popup-footer-link" data-action="panel">Ver más</button>
@@ -950,9 +964,12 @@ const DocsHighlighter = {
       });
 
     this.popupElement
-      .querySelector('[data-action="apply"]')
-      ?.addEventListener("click", () => {
-        DocsReviewer.aplicarCorreccion(issue.id);
+      .querySelectorAll('[data-action="apply"]')
+      .forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const chosen = btn.dataset.sugerencia || null;
+          DocsReviewer.aplicarCorreccion(issue.id, chosen);
+        });
       });
 
     this.popupElement

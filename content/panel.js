@@ -9,7 +9,7 @@ const DocsPanel = {
     try {
       await DocsReader.esperarDocumentoListo();
 
-      const logoURL = DocsRuntime.getURL("assets/icons/hammer.svg");
+      const logoURL = DocsRuntime.getURL("assets/icons/logo.svg");
       const logoMarkup = logoURL
         ? `<img src="${logoURL}" class="docs-reviewer-logo" alt="" />`
         : "";
@@ -119,7 +119,7 @@ const DocsPanel = {
 
     if (allMatches.length === 0) {
       this.issuesContainer.innerHTML =
-        '<p class="docs-reviewer-placeholder">✓ No se encontraron problemas</p>';
+        '<p class="docs-reviewer-placeholder docs-reviewer-placeholder-success">✓ No se encontraron problemas</p>';
       return;
     }
 
@@ -146,11 +146,7 @@ const DocsPanel = {
 
         const reglaElement = document.createElement("div");
         reglaElement.className = "docs-reviewer-issue-regla";
-        reglaElement.innerHTML = `<span class="docs-reviewer-issue-color">${regla.nombre}</span>`;
-
-        const textoElement = document.createElement("div");
-        textoElement.className = "docs-reviewer-issue-texto";
-        textoElement.textContent = `${issue.descripcion} (${idx + 1}/${issues.length})`;
+        reglaElement.innerHTML = `<span class="docs-reviewer-issue-color">${regla.nombre}</span><span class="docs-reviewer-issue-counter">${idx + 1}/${issues.length}</span>`;
 
         const originalElement = document.createElement("div");
         originalElement.className = "docs-reviewer-issue-original";
@@ -161,14 +157,21 @@ const DocsPanel = {
         );
 
         issueDiv.appendChild(reglaElement);
-        issueDiv.appendChild(textoElement);
         issueDiv.appendChild(originalElement);
 
-        if (
+        const PLACEHOLDER_SUGGESTIONS = [
+          "(simplifica dividiendo en múltiples oraciones)",
+          "(considera usar voz activa)",
+        ];
+        const hasMultipleSugerencias =
+          Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
+        const canApplyFromPanel =
           issue.sugerencia &&
-          issue.sugerencia !==
-            "(simplifica dividiendo en múltiples oraciones)" &&
-          issue.sugerencia !== "(considera usar voz activa)"
+          !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
+
+        if (
+          canApplyFromPanel &&
+          !hasMultipleSugerencias
         ) {
           const suggestionElement = document.createElement("div");
           suggestionElement.className = "docs-reviewer-issue-sugerencia";
@@ -176,22 +179,32 @@ const DocsPanel = {
           issueDiv.appendChild(suggestionElement);
         }
 
-        const PLACEHOLDER_SUGGESTIONS = [
-          "(simplifica dividiendo en múltiples oraciones)",
-          "(considera usar voz activa)",
-        ];
-        const canApplyFromPanel =
-          issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
-
-        const buttonElement = document.createElement("button");
-        buttonElement.className = "docs-reviewer-issue-button";
-        buttonElement.textContent = canApplyFromPanel ? "Aplicar cambio" : "Ver en documento";
-        buttonElement.addEventListener("click", (event) => {
-          event.stopPropagation();
-          DocsReviewer.aplicarCorreccion(issue.id);
-        });
-
-        issueDiv.appendChild(buttonElement);
+        if (hasMultipleSugerencias) {
+          const buttonGroup = document.createElement("div");
+          buttonGroup.className = "docs-reviewer-issue-button-group";
+          issue.sugerencias.forEach((s) => {
+            const btn = document.createElement("button");
+            btn.className = "docs-reviewer-issue-button docs-reviewer-issue-button-option";
+            btn.textContent = s;
+            btn.addEventListener("click", (event) => {
+              event.stopPropagation();
+              DocsReviewer.aplicarCorreccion(issue.id, s);
+            });
+            buttonGroup.appendChild(btn);
+          });
+          issueDiv.appendChild(buttonGroup);
+        } else {
+          const buttonElement = document.createElement("button");
+          buttonElement.className = "docs-reviewer-issue-button";
+          buttonElement.textContent = canApplyFromPanel
+            ? "Aplicar cambio"
+            : "Ver en documento";
+          buttonElement.addEventListener("click", (event) => {
+            event.stopPropagation();
+            DocsReviewer.aplicarCorreccion(issue.id);
+          });
+          issueDiv.appendChild(buttonElement);
+        }
         issueDiv.addEventListener("mouseenter", () => {
           DocsReviewer.setIssueActivo(issue.id, { showPopup: false });
         });

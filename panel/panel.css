@@ -183,11 +183,27 @@
 }
 
 .docs-reviewer-placeholder {
-  padding: 24px 16px;
+  margin: 16px;
+  padding: 18px 16px;
   text-align: center;
-  color: #999;
-  font-size: 13px;
-  margin: 0;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+}
+
+.docs-reviewer-placeholder-success {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.docs-reviewer-placeholder.docs-reviewer-error {
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 /* Cada item de issue */
@@ -241,8 +257,20 @@
   background: #f1c40f;
 }
 
+.docs-reviewer-issue[data-regla="tecnicismos"] .docs-reviewer-issue-regla::before {
+  background: #e67e22;
+}
+
 .docs-reviewer-issue-color {
   color: #666;
+  flex: 1;
+}
+
+.docs-reviewer-issue-counter {
+  margin-left: auto;
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
 }
 
 .docs-reviewer-issue-texto {
@@ -310,6 +338,17 @@
   cursor: pointer;
   transition: background-color 0.2s;
   width: 100%;
+}
+
+.docs-reviewer-issue-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.docs-reviewer-issue-button-group .docs-reviewer-issue-button {
+  width: auto;
+  flex: 1 1 auto;
 }
 
 .docs-reviewer-issue-button:hover {
@@ -475,6 +514,15 @@
   display: flex;
   gap: 8px;
   margin-top: 12px;
+}
+
+.docs-reviewer-popup-actions-multi {
+  flex-wrap: wrap;
+}
+
+.docs-reviewer-popup-actions-multi .docs-reviewer-popup-button {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .docs-reviewer-popup-button {

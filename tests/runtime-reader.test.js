@@ -65,7 +65,8 @@ test("DocsRuntime normaliza lastError del callback sin dejar rechazo no manejado
   const sandbox = createSandbox({
     sendMessage(_message, callback) {
       this.lastError = {
-        message: "Could not establish connection. Receiving end does not exist.",
+        message:
+          "Could not establish connection. Receiving end does not exist.",
       };
       callback();
       this.lastError = null;
@@ -94,7 +95,7 @@ test("DocsRuntime.getURL devuelve null cuando el contexto de la extension fue in
   });
 
   const resolvedUrl = vm.runInContext(
-    `DocsRuntime.getURL("assets/icons/hammer.svg")`,
+    `DocsRuntime.getURL("assets/icons/logo.svg")`,
     sandbox,
   );
 

@@ -42,7 +42,8 @@
         "https://docs.google.com/*"
       ],
       "js": [
-        "content/canvas-patcher.js"
+        "content/canvas-patcher.js",
+        "content/kix-bridge.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"
@@ -56,10 +57,12 @@
         "vendor/es-compromise.min.js",
         "rules/index.js",
         "rules/arcaismos.js",
+        "rules/tecnicismos.js",
         "rules/voz-pasiva.js",
         "rules/queismo.js",
         "content/runtime.js",
         "content/reader.js",
+        "content/docs-editor.js",
         "content/highlighter.js",
         "content/panel.js",
         "content/content.js"

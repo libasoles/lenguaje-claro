@@ -246,15 +246,17 @@ const DocsReviewer = {
     DocsPanel.mostrarErrorExtensionRecargada();
   },
 
-  async aplicarCorreccion(issueOrId) {
+  async aplicarCorreccion(issueOrId, chosenSugerencia = null) {
     const issue = this.getIssue(issueOrId);
     if (!issue) return;
+
+    const sugerencia = chosenSugerencia || issue.sugerencia;
 
     const PLACEHOLDER_SUGGESTIONS = [
       "(simplifica dividiendo en múltiples oraciones)",
       "(considera usar voz activa)",
     ];
-    if (issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia)) {
+    if (sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(sugerencia)) {
       const docId = DocsReader.getDocumentId();
       if (!docId) return;
 
@@ -273,14 +275,14 @@ const DocsReviewer = {
           type: "APPLY_REPLACEMENT",
           docId,
           original: issue.textoOriginal,
-          replacement: issue.sugerencia,
+          replacement: sugerencia,
           range: apiRange,
         });
 
         if (response?.success) {
           this.undoStack.push({
             originalText: issue.textoOriginal,
-            replacementText: issue.sugerencia,
+            replacementText: sugerencia,
             sourceStart: issue.inicio,
           });
           await this.analizarDocumento();
