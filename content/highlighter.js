@@ -12,6 +12,8 @@ const DocsHighlighter = {
   hidePopupTimer: null,
   mutationObserver: null,
   reanalysisTimer: null,
+  _recalcGeneration: 0,
+  _measureCanvas: null,
 
   inicializar() {
     if (this.overlayElement && this.popupElement) return;
@@ -92,38 +94,68 @@ const DocsHighlighter = {
     this.hidePopup();
   },
 
-  recalcularPosiciones() {
+  async recalcularPosiciones() {
     if (!this.overlayElement) return;
     if (!this.issues?.length) {
       this.renderMarkers(new Map());
       return;
     }
 
+    const generation = ++this._recalcGeneration;
+
+    // Try DOM approach first — works when accessibility mode is enabled in GDocs.
     const textRoot = this.getTextRoot();
-    if (!textRoot) {
-      console.log(
-        "[Legal Docs] Highlighter: no se encontró textRoot visible",
-      );
+    if (textRoot) {
+      const textModel = this.buildTextModel(textRoot);
+      if (textModel.normalizedText.length > 0) {
+        const issueRects = this.mapIssuesToRects(textModel);
+        const visibleIssues = Array.from(issueRects.values()).filter(
+          (rects) => rects.length > 0,
+        ).length;
+        console.log("[Legal Docs] Highlighter (DOM):", {
+          root: textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
+          modelLength: textModel.normalizedText.length,
+          issues: this.issues.length,
+          visibleIssues,
+        });
+        if (visibleIssues > 0) {
+          if (generation === this._recalcGeneration) this.renderMarkers(issueRects);
+          return;
+        }
+
+        console.log(
+          "[Legal Docs] Highlighter (DOM): no visible rects, trying canvas fallback",
+        );
+      }
+    }
+
+    // Fall back to canvas-fragment approach (GDocs renders in <canvas> without accessibility mode).
+    const canvasData = await this.requestCanvasFragments();
+    if (generation !== this._recalcGeneration) return;
+
+    if (!canvasData.length) {
+      console.log("[Legal Docs] Highlighter: no text root and no canvas fragments");
       this.renderMarkers(new Map());
       return;
     }
 
-    const textModel = this.buildTextModel(textRoot);
-    const issueRects = this.mapIssuesToRects(textModel);
+    const sortedFragments = this.buildSortedFragments(canvasData);
+    const canvasTextModel = this.buildCanvasTextModel(sortedFragments);
+    const issueRects = this.mapIssuesToRectsFromCanvas(
+      sortedFragments,
+      canvasTextModel,
+    );
     const visibleIssues = Array.from(issueRects.values()).filter(
       (rects) => rects.length > 0,
     ).length;
-
-    console.log("[Legal Docs] Highlighter:", {
-      root:
-        textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
-      blocks: this.getTextBlocks(textRoot).length,
-      modelLength: textModel.normalizedText.length,
+    console.log("[Legal Docs] Highlighter (canvas):", {
+      canvases: canvasData.length,
+      fragments: sortedFragments.length,
+      modelLength: canvasTextModel.normalizedText.length,
       issues: this.issues.length,
       visibleIssues,
     });
-
-    this.renderMarkers(issueRects);
+    if (generation === this._recalcGeneration) this.renderMarkers(issueRects);
   },
 
   scheduleRecalculate() {
@@ -466,7 +498,13 @@ const DocsHighlighter = {
         startIndex === undefined ||
         endIndex === null ||
         endIndex === undefined ||
-        endIndex > textModel.charMap.length;
+        endIndex > textModel.charMap.length ||
+        !this.rangeMatchesNeedle(
+          textModel.normalizedLower,
+          startIndex,
+          endIndex,
+          normalizedNeedle,
+        );
 
       if (needsTextFallback) {
         if (!normalizedNeedle) {
@@ -537,6 +575,21 @@ const DocsHighlighter = {
 
   normalizeText(text) {
     return (text || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+  },
+
+  rangeMatchesNeedle(normalizedText, startIndex, endIndex, needle) {
+    if (
+      !needle ||
+      !normalizedText ||
+      !Number.isInteger(startIndex) ||
+      !Number.isInteger(endIndex) ||
+      startIndex < 0 ||
+      endIndex <= startIndex
+    ) {
+      return false;
+    }
+
+    return normalizedText.slice(startIndex, endIndex) === needle;
   },
 
   findBestNeedleMatch(haystack, needle, preferredStart) {
@@ -899,6 +952,242 @@ const DocsHighlighter = {
 
     container.scrollBy({ top: delta, behavior: "smooth" });
   },
+
+  // ── Canvas-based highlighting ──────────────────────────────────────────────
+  // Used when GDocs renders in canvas mode (no DOM text nodes).
+  // The canvas-patcher.js MAIN-world script captures fillText calls.
+  // We request those fragments via CustomEvent, then map issues to viewport rects
+  // by searching for the issue text in the concatenated fragment stream.
+
+  requestCanvasFragments(timeout = 800) {
+    return new Promise((resolve) => {
+      const handler = (event) => {
+        document.removeEventListener("docs-reviewer-fragments-data", handler);
+        resolve(event.detail || []);
+      };
+      document.addEventListener("docs-reviewer-fragments-data", handler);
+      document.dispatchEvent(new Event("docs-reviewer-request-fragments"));
+      setTimeout(() => {
+        document.removeEventListener("docs-reviewer-fragments-data", handler);
+        resolve([]);
+      }, timeout);
+    });
+  },
+
+  buildSortedFragments(canvasDataArray) {
+    const all = [];
+    for (const cd of canvasDataArray) {
+      const canvasWidth = cd.canvasSize?.width || cd.canvasRect.width || 1;
+      const canvasHeight = cd.canvasSize?.height || cd.canvasRect.height || 1;
+      const bitmapToViewportScaleX = cd.canvasRect.width / canvasWidth;
+      const bitmapToViewportScaleY = cd.canvasRect.height / canvasHeight;
+
+      for (const frag of cd.fragments) {
+        const matrix = frag.matrix || {
+          a: 1,
+          b: 0,
+          c: 0,
+          d: 1,
+          e: 0,
+          f: 0,
+        };
+        const baselineBitmapX = matrix.a * frag.x + matrix.c * frag.y + matrix.e;
+        const baselineBitmapY = matrix.b * frag.x + matrix.d * frag.y + matrix.f;
+        const scaleX =
+          Math.hypot(matrix.a, matrix.b) * bitmapToViewportScaleX || 1;
+        const scaleY =
+          Math.hypot(matrix.c, matrix.d) * bitmapToViewportScaleY || 1;
+
+        all.push({
+          text: frag.text,
+          x: frag.x,
+          y: frag.y,
+          font: frag.font,
+          textAlign: frag.textAlign,
+          textBaseline: frag.textBaseline,
+          direction: frag.direction,
+          matrix,
+          canvasRect: cd.canvasRect,
+          viewportBaselineX:
+            cd.canvasRect.left + baselineBitmapX * bitmapToViewportScaleX,
+          viewportBaselineY:
+            cd.canvasRect.top + baselineBitmapY * bitmapToViewportScaleY,
+          viewportScaleX: scaleX,
+          viewportScaleY: scaleY,
+        });
+      }
+    }
+    // Sort in reading order: top-to-bottom, then left-to-right.
+    all.sort((a, b) => {
+      const yDiff = a.viewportBaselineY - b.viewportBaselineY;
+      if (Math.abs(yDiff) > 2) return yDiff;
+      return a.viewportBaselineX - b.viewportBaselineX;
+    });
+    return all;
+  },
+
+  buildCanvasTextModel(sortedFragments) {
+    const normalizedChars = [];
+    const charMap = [];
+    let previousWasWhitespace = false;
+
+    sortedFragments.forEach((frag, fragIndex) => {
+      const text = frag.text || "";
+      for (let charOffset = 0; charOffset < text.length; charOffset += 1) {
+        const char = text[charOffset];
+        const isWhitespace = /\s/.test(char);
+
+        if (isWhitespace) {
+          if (!previousWasWhitespace) {
+            normalizedChars.push(" ");
+            charMap.push({ fragIndex, charOffset });
+            previousWasWhitespace = true;
+          }
+          continue;
+        }
+
+        normalizedChars.push(char);
+        charMap.push({ fragIndex, charOffset });
+        previousWasWhitespace = false;
+      }
+    });
+
+    const normalizedText = normalizedChars.join("");
+    return {
+      normalizedText,
+      normalizedLower: normalizedText.toLocaleLowerCase(),
+      charMap,
+    };
+  },
+
+  mapIssuesToRectsFromCanvas(sortedFragments, canvasTextModel) {
+    const issueRects = new Map();
+
+    for (const issue of this.issues) {
+      let startIndex = issue.normalizedStart;
+      let endIndex = issue.normalizedEnd;
+      const normalizedNeedle = this.normalizeText(issue.textoOriginal);
+      let rects = [];
+
+      const needsTextFallback =
+        startIndex === null ||
+        startIndex === undefined ||
+        endIndex === null ||
+        endIndex === undefined ||
+        endIndex > canvasTextModel.charMap.length ||
+        !this.rangeMatchesNeedle(
+          canvasTextModel.normalizedLower,
+          startIndex,
+          endIndex,
+          normalizedNeedle,
+        );
+
+      if (!needsTextFallback) {
+        rects = this.computeRectsFromCanvasIndices(
+          sortedFragments,
+          canvasTextModel.charMap,
+          startIndex,
+          endIndex,
+        );
+      }
+
+      if (!rects.length && normalizedNeedle) {
+        const fallbackStart = this.findBestNeedleMatch(
+          canvasTextModel.normalizedLower,
+          normalizedNeedle,
+          startIndex,
+        );
+
+        if (fallbackStart !== -1) {
+          rects = this.computeRectsFromCanvasIndices(
+            sortedFragments,
+            canvasTextModel.charMap,
+            fallbackStart,
+            fallbackStart + normalizedNeedle.length,
+          );
+        }
+      }
+
+      issue.rects = rects;
+      issue.isVisible = rects.length > 0;
+      issueRects.set(issue.id, rects);
+    }
+    return issueRects;
+  },
+
+  computeRectsFromCanvasIndices(sortedFragments, charMap, startIndex, endIndex) {
+    if (!Array.isArray(charMap) || startIndex < 0 || endIndex <= startIndex) {
+      return [];
+    }
+
+    const fragPortions = new Map();
+    for (let ci = startIndex; ci < endIndex; ci++) {
+      const ref = charMap[ci];
+      if (!ref) continue;
+      const { fragIndex, charOffset } = ref;
+      if (!fragPortions.has(fragIndex)) {
+        fragPortions.set(fragIndex, { start: charOffset, end: charOffset + 1 });
+      } else {
+        const p = fragPortions.get(fragIndex);
+        p.start = Math.min(p.start, charOffset);
+        p.end = Math.max(p.end, charOffset + 1);
+      }
+    }
+
+    const rects = [];
+    for (const [fragIndex, portion] of fragPortions) {
+      const rect = this.computeFragmentPortionRect(
+        sortedFragments[fragIndex],
+        portion.start,
+        portion.end,
+      );
+      if (rect) rects.push(rect);
+    }
+
+    return this.normalizeRects(rects);
+  },
+
+  computeFragmentPortionRect(frag, startChar, endChar) {
+    if (!this._measureCanvas) {
+      this._measureCanvas = document.createElement("canvas");
+    }
+    const ctx = this._measureCanvas.getContext("2d");
+    ctx.font = frag.font;
+
+    const prefix = frag.text.substring(0, startChar);
+    const selected = frag.text.substring(startChar, endChar);
+    if (!selected) return null;
+
+    const prefixWidth = ctx.measureText(prefix).width;
+    const selMetrics = ctx.measureText(selected);
+    const selWidth = selMetrics.width;
+    // Metrics are in the canvas user-space units used by fillText().
+    const ascent = selMetrics.actualBoundingBoxAscent || 10;
+    const descent = selMetrics.actualBoundingBoxDescent || 3;
+    const scaleX = frag.viewportScaleX || 1;
+    const scaleY = frag.viewportScaleY || 1;
+
+    let left = frag.viewportBaselineX + prefixWidth * scaleX;
+    let right = left + selWidth * scaleX;
+
+    if (frag.textAlign === "center") {
+      const fullWidth = ctx.measureText(frag.text).width * scaleX;
+      left -= fullWidth / 2;
+      right -= fullWidth / 2;
+    } else if (frag.textAlign === "right" || frag.textAlign === "end") {
+      const fullWidth = ctx.measureText(frag.text).width * scaleX;
+      left -= fullWidth;
+      right -= fullWidth;
+    }
+
+    const top = frag.viewportBaselineY - ascent * scaleY;
+    const bottom = frag.viewportBaselineY + descent * scaleY;
+
+    if (right - left < 1 || bottom - top < 1) return null;
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  },
+
+  // ── End canvas-based highlighting ──────────────────────────────────────────
 
   escapeHTML(text) {
     return String(text || "")

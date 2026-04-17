@@ -27,6 +27,12 @@
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/*"],
+      "js": ["content/canvas-patcher.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://docs.google.com/*"],
       "js": [
         "vendor/compromise.min.js",
         "vendor/es-compromise.min.js",

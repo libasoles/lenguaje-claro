@@ -110,7 +110,9 @@ const DocsReviewer = {
     this._pendingReanalysis = false;
 
     try {
-      DocsPanel.mostrarCargando();
+      if (this.allMatches.length === 0) {
+        DocsPanel.mostrarCargando();
+      }
       DocsHighlighter.limpiar();
       console.log("[Legal Docs] Obteniendo texto del documento...");
 

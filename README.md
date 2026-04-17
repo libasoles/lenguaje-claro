@@ -1,6 +1,10 @@
 # Lenguaje claro - Extensión Chrome para Google Docs
 
-Una extensión de Chrome similar a Grammarly que revisa y mejora la escritura en Google Docs, detectando problemas de estilo y sugiriendo mejoras.
+Una extensión de Chrome que se enfoca en reglas de escritura jurídica en el marco de lenguaje claro.
+
+Revisa y mejora la escritura en Google Docs, detectando problemas de estilo y sugiriendo mejoras. Es similar a Grammarly, ProWritingAid o Hemingway App pero pensada para profesionales del derecho.
+
+No envía datos a servidores externos, funciona 100% en el navegador, y es de código abierto. Por esto, se puede trabajar en documentos sensibles sin preocupaciones de privacidad.
 
 ## Características
 
