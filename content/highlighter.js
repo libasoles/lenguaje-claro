@@ -16,6 +16,8 @@ export const DocsHighlighter = {
   hidePopupTimer: null,
   mutationObserver: null,
   reanalysisTimer: null,
+  bootstrapRetryTimer: null,
+  bootstrapRetryDeadline: 0,
   _recalcGeneration: 0,
   _measureCanvas: null,
 
@@ -46,6 +48,10 @@ export const DocsHighlighter = {
 
     window.addEventListener("resize", () => this.scheduleRecalculate());
     window.addEventListener("scroll", () => this.scheduleRecalculate(), true);
+    document.addEventListener("docs-reviewer-canvas-rendered", () => {
+      if (!this.issues?.length) return;
+      this.scheduleRecalculate();
+    });
     document.addEventListener("click", (event) =>
       this.handleDocumentClick(event),
     );
@@ -65,16 +71,12 @@ export const DocsHighlighter = {
     this.activeIssueId = null;
     this.renderMarkers(new Map());
 
-    // Esperar a que el textRoot esté disponible
-    const textRoot = await this.waitForTextRoot();
-    if (!textRoot) {
-      console.log(
-        "[Legal Docs] aplicarHighlights: Could not find text root, will retry on mutation",
-      );
-    }
-
+    // No bloquear el primer render esperando el text root: en Google Docs
+    // el contenido suele entrar primero por canvas y el fallback ya puede ubicar rects.
     this.scheduleRecalculate();
     this.observeTextRoot();
+    this.scheduleBootstrapRetry();
+    void this.ensureTextRootObservation();
   },
 
   limpiar() {
@@ -87,6 +89,7 @@ export const DocsHighlighter = {
       clearTimeout(this.reanalysisTimer);
       this.reanalysisTimer = null;
     }
+    this.clearBootstrapRetry();
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
       this.mutationObserver = null;
@@ -180,6 +183,68 @@ export const DocsHighlighter = {
       this.recalcFrame = 0;
       this.recalcularPosiciones();
     });
+  },
+
+  ensureTextRootObservation(timeout = 5000) {
+    return this.waitForTextRoot(timeout).then((textRoot) => {
+      if (!textRoot) {
+        console.log(
+          "[Legal Docs] aplicarHighlights: Could not find text root during bootstrap",
+        );
+        return null;
+      }
+
+      if (!this.issues?.length) {
+        return textRoot;
+      }
+
+      this.observeTextRoot();
+      this.scheduleRecalculate();
+      return textRoot;
+    });
+  },
+
+  clearBootstrapRetry() {
+    if (this.bootstrapRetryTimer) {
+      clearTimeout(this.bootstrapRetryTimer);
+      this.bootstrapRetryTimer = null;
+    }
+    this.bootstrapRetryDeadline = 0;
+  },
+
+  shouldRetryBootstrap() {
+    return (
+      Array.isArray(this.issues) &&
+      this.issues.length > 0 &&
+      this.countVisibleIssueRects(this.currentRects) === 0
+    );
+  },
+
+  scheduleBootstrapRetry({ intervalMs = 250, durationMs = 4000 } = {}) {
+    this.clearBootstrapRetry();
+    if (!this.shouldRetryBootstrap()) return;
+
+    this.bootstrapRetryDeadline = Date.now() + durationMs;
+
+    const retry = () => {
+      this.bootstrapRetryTimer = null;
+
+      if (!this.shouldRetryBootstrap()) {
+        this.clearBootstrapRetry();
+        return;
+      }
+
+      this.scheduleRecalculate();
+
+      if (Date.now() >= this.bootstrapRetryDeadline) {
+        this.clearBootstrapRetry();
+        return;
+      }
+
+      this.bootstrapRetryTimer = setTimeout(retry, intervalMs);
+    };
+
+    this.bootstrapRetryTimer = setTimeout(retry, intervalMs);
   },
 
   scheduleReanalysis() {
@@ -782,6 +847,10 @@ export const DocsHighlighter = {
   renderMarkers(issueRects) {
     this.currentRects = issueRects;
     this.syncIssuesWithRects(issueRects);
+
+    if (!this.shouldRetryBootstrap()) {
+      this.clearBootstrapRetry();
+    }
 
     this.issueMarkers.forEach((markers) => {
       markers.forEach((marker) => marker.remove());

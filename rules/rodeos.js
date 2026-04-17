@@ -12,7 +12,6 @@ export const rodeosRule = {
     { original: "de conformidad con", sugerencia: "según" },
     { original: "en vista de que", sugerencia: "por" },
     { original: "no obstante el hecho de que", sugerencia: "aunque" },
-    { original: "a fin de", sugerencia: "para" },
     { original: "con el objeto de", sugerencia: "para" },
     { original: "para el propósito de", sugerencia: "para" },
     { original: "con la finalidad de", sugerencia: "para" },
@@ -22,6 +21,56 @@ export const rodeosRule = {
     { original: "toda vez que", sugerencia: "porque" },
     { original: "en el entendido de", sugerencia: "porque" },
     { original: "como efecto de", sugerencia: "porque" },
+    {
+      original: "a fin de",
+      sugerencias: ["para"],
+      palabrasClaves: "a fin de",
+    },
+    {
+      original: "con el objeto de",
+      sugerencias: ["para"],
+      palabrasClaves: "con el objeto de",
+    },
+    {
+      original: "para el propósito de",
+      sugerencias: ["para"],
+      palabrasClaves: "para el propósito de",
+    },
+    {
+      original: "con la finalidad de",
+      sugerencias: ["para"],
+      palabrasClaves: "con la finalidad de",
+    },
+    {
+      original: "en el entendido de",
+      sugerencias: ["porque", "ya que"],
+      palabrasClaves: "en el entendido de",
+    },
+    {
+      original: "toda vez que",
+      sugerencias: ["porque", "ya que"],
+      palabrasClaves: "toda vez que",
+    },
+    {
+      original: "debido a que",
+      sugerencias: ["porque"],
+      palabrasClaves: "debido a que",
+    },
+    {
+      original: "no obstante el hecho de que",
+      sugerencias: ["aunque", "a pesar de que"],
+      palabrasClaves: "no obstante el hecho de que",
+    },
+    {
+      original: "de conformidad con",
+      sugerencias: ["según", "bajo"],
+      palabrasClaves: "de conformidad con",
+    },
+    {
+      original: "a considerable distancia",
+      sugerencias: ["lejos"],
+      palabrasClaves: "a considerable distancia",
+    },
   ],
 
   detectar(texto) {

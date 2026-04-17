@@ -57,6 +57,21 @@ export const arcaismosRule = {
       sugerencia: "texto literal",
       palabrasClaves: "tenor literal",
     },
+    {
+      original: "tengo el agrado de dirigirme",
+      sugerencias: ["le escribo para"],
+      palabrasClaves: "tengo el agrado de dirigirme",
+    },
+    {
+      original: "obra en mi poder",
+      sugerencias: ["tengo"],
+      palabrasClaves: "obra en mi poder",
+    },
+    {
+      original: "elevar una consulta",
+      sugerencias: ["consultar", "preguntar"],
+      palabrasClaves: "elevar una consulta",
+    },
   ],
 
   detectar(texto) {

@@ -34,6 +34,26 @@ function createEventTarget() {
 
 function loadCanvasPatcher() {
   let now = 0;
+  let timerId = 1;
+  const timers = new Map();
+
+  function runDueTimers() {
+    let ran = true;
+
+    while (ran) {
+      ran = false;
+      const dueTimers = Array.from(timers.entries())
+        .filter(([, timer]) => timer.runAt <= now)
+        .sort((a, b) => a[1].runAt - b[1].runAt || a[0] - b[0]);
+
+      dueTimers.forEach(([id, timer]) => {
+        if (!timers.has(id)) return;
+        timers.delete(id);
+        timer.callback();
+        ran = true;
+      });
+    }
+  }
 
   function CanvasRenderingContext2D() {
     this.canvas = null;
@@ -72,6 +92,14 @@ function loadCanvasPatcher() {
         return now;
       },
     },
+    setTimeout(callback, delay = 0) {
+      const id = timerId++;
+      timers.set(id, { callback, runAt: now + delay });
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+    },
     CanvasRenderingContext2D,
   };
 
@@ -85,6 +113,7 @@ function loadCanvasPatcher() {
     document,
     setNow(value) {
       now = value;
+      runDueTimers();
     },
   };
 }
@@ -129,4 +158,38 @@ test("descarta fragmentos viejos cuando una nueva rafaga de render reemplaza el 
   assert.equal(secondSnapshot.length, 1);
   assert.equal(secondSnapshot[0].fragments.length, 1);
   assert.equal(secondSnapshot[0].fragments[0].x, 320);
+});
+
+test("emite un evento cuando termina una rafaga de render en canvas", () => {
+  const { CanvasRenderingContext2D, document, setNow } = loadCanvasPatcher();
+
+  const canvas = {
+    width: 800,
+    height: 400,
+    isConnected: true,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 800, height: 400 };
+    },
+  };
+
+  const ctx = new CanvasRenderingContext2D();
+  ctx.canvas = canvas;
+
+  const renderEvents = [];
+  document.addEventListener("docs-reviewer-canvas-rendered", (event) => {
+    renderEvents.push(event.detail?.renderedAt);
+  });
+
+  setNow(0);
+  ctx.fillText("Primera línea", 100, 100);
+  ctx.fillText("Segunda línea", 100, 120);
+
+  assert.equal(renderEvents.length, 0);
+
+  setNow(39);
+  assert.equal(renderEvents.length, 0);
+
+  setNow(40);
+  assert.equal(renderEvents.length, 1);
+  assert.equal(renderEvents[0], 40);
 });

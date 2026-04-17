@@ -66,6 +66,39 @@ test("mergeIssueRects conserva rects DOM y completa faltantes desde canvas", () 
   assert.equal(highlighter.countVisibleIssueRects(merged), 2);
 });
 
+test("aplicarHighlights dispara el primer recálculo sin esperar al text root", async () => {
+  const highlighter = loadHighlighter();
+  const calls = [];
+
+  highlighter.inicializar = () => {
+    calls.push("init");
+  };
+  highlighter.renderMarkers = (issueRects) => {
+    highlighter.currentRects = issueRects;
+    calls.push(`render:${issueRects.size}`);
+  };
+  highlighter.scheduleRecalculate = () => {
+    calls.push("schedule");
+  };
+  highlighter.observeTextRoot = () => {
+    calls.push("observe");
+  };
+  highlighter.scheduleBootstrapRetry = () => {
+    calls.push("bootstrap");
+  };
+  highlighter.waitForTextRoot = () => new Promise(() => {});
+
+  await highlighter.aplicarHighlights([{ id: "arcaismos-0" }]);
+
+  assert.deepEqual(calls, [
+    "init",
+    "render:0",
+    "schedule",
+    "observe",
+    "bootstrap",
+  ]);
+});
+
 test("syncIssuesWithRects deja visible un issue recuperado por fallback", () => {
   const highlighter = loadHighlighter();
 

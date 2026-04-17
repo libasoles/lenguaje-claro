@@ -7,9 +7,9 @@ export const palabrasExtranasRule = {
   color: "#e67e22", // Naranja
 
   diccionario: [
+    // TODO; overlap con tecnicismos
     { original: "empero", sugerencia: "sin embargo", palabrasClaves: "empero" },
     { original: "dilación", sugerencia: "demora", palabrasClaves: "dilación" },
-    { original: "per cápita", sugerencia: "por persona", palabrasClaves: "per cápita" },
   ],
 
   detectar(texto) {

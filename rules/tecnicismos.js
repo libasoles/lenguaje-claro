@@ -90,6 +90,36 @@ export const tecnicismosRule = {
       sugerencias: ["firmado"],
       palabrasClaves: "suscripto",
     },
+    {
+      original: "fojas",
+      sugerencias: ["páginas", "hojas"],
+      palabrasClaves: "fojas",
+    },
+    {
+      original: "notificar",
+      sugerencias: ["avisar", "comunicar"],
+      palabrasClaves: "notificar",
+    },
+    {
+      original: "arbitrar los medios",
+      sugerencias: ["hacer lo necesario", "gestionar"],
+      palabrasClaves: "arbitrar los medios",
+    },
+    {
+      original: "erogación",
+      sugerencias: ["gasto", "pago"],
+      palabrasClaves: "erogación",
+    },
+    {
+      original: "fehacientemente",
+      sugerencias: ["de forma comprobable", "formalmente"],
+      palabrasClaves: "fehacientemente",
+    },
+    {
+      original: "autógrafa",
+      sugerencias: ["firma de puño y letra"],
+      palabrasClaves: "autógrafa",
+    },
   ],
 
   detectar(texto) {
@@ -101,7 +131,9 @@ export const tecnicismosRule = {
       let match;
 
       while ((match = regex.exec(texto)) !== null) {
-        const sugerencias = item.sugerencias.map((s) => mantenerCase(match[0], s));
+        const sugerencias = item.sugerencias.map((s) =>
+          mantenerCase(match[0], s),
+        );
         matches.push({
           id: `${this.id}-${matches.length}`,
           inicio: match.index,

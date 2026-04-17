@@ -10,6 +10,7 @@
 
   // Map from canvas element → { fragments, lastWriteAt }
   const canvasStates = new Map();
+  let renderNotificationTimer = null;
 
   function getNow() {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -47,6 +48,21 @@
     };
   }
 
+  function scheduleRenderNotification() {
+    if (renderNotificationTimer) {
+      clearTimeout(renderNotificationTimer);
+    }
+
+    renderNotificationTimer = setTimeout(function () {
+      renderNotificationTimer = null;
+      document.dispatchEvent(
+        new CustomEvent('docs-reviewer-canvas-rendered', {
+          detail: { renderedAt: getNow() },
+        }),
+      );
+    }, RENDER_BURST_GAP_MS);
+  }
+
   const origClearRect = CanvasRenderingContext2D.prototype.clearRect;
   CanvasRenderingContext2D.prototype.clearRect = function (x, y, w, h) {
     // Full-canvas clear signals a new render cycle for this tile.
@@ -82,6 +98,7 @@
         direction: this.direction,
         matrix: serializeMatrix(this),
       });
+      scheduleRenderNotification();
     }
     return origFillText.apply(this, arguments);
   };
