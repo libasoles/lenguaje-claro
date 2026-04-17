@@ -1,7 +1,15 @@
 // content.js - Orquesta el análisis usando la Google Docs API vía background service worker
 // y sincroniza panel + overlay inline.
 
-const DocsReviewer = {
+import { rules } from "../rules/index.js";
+import { DocsEditor } from "./docs-editor.js";
+import { DocsHighlighter } from "./highlighter.js";
+import { DocsPanel } from "./panel.js";
+import { DocsReader } from "./reader.js";
+import { setReviewerActions } from "./reviewer-actions.js";
+import { DocsRuntime } from "./runtime.js";
+
+export const DocsReviewer = {
   allMatches: [],
   issuesById: new Map(),
   activeIssueId: null,
@@ -36,7 +44,6 @@ const DocsReviewer = {
   },
 
   getRuleMap() {
-    const rules = window.docsReviewerRules || [];
     return new Map(rules.map((rule) => [rule.id, rule]));
   },
 
@@ -153,8 +160,8 @@ const DocsReviewer = {
 
       const collectedMatches = [];
 
-      if (window.docsReviewerRules?.length > 0) {
-        window.docsReviewerRules.forEach((regla) => {
+      if (rules.length > 0) {
+        rules.forEach((regla) => {
           try {
             const matches = regla.detectar(textoCompleto);
             console.log(
@@ -474,4 +481,9 @@ const DocsReviewer = {
   },
 };
 
+setReviewerActions(DocsReviewer);
 DocsReviewer.init();
+
+void DocsEditor;
+
+export default DocsReviewer;

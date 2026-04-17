@@ -1,6 +1,6 @@
 // runtime.js - Helpers seguros para acceder a chrome.runtime desde content scripts.
 
-const DocsRuntime = (window.DocsRuntime = {
+export const DocsRuntime = {
   INVALIDATED_CONTEXT_MESSAGE:
     "La extensión se actualizó. Recargá la página para continuar.",
 
@@ -65,4 +65,6 @@ const DocsRuntime = (window.DocsRuntime = {
       return null;
     }
   },
-});
+};
+
+export default DocsRuntime;

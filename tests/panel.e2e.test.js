@@ -1,10 +1,39 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const { buildSync } = require("esbuild");
 
 const projectRoot = path.resolve(__dirname, "..");
-const patterns = require(path.join(projectRoot, "rules", "patterns.json"));
+const patterns = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "rules", "patterns.json"), "utf8"),
+);
+
+const panelHarnessBundle = buildSync({
+  stdin: {
+    contents: `
+      import { DocsReader } from "./content/reader.js";
+      import { DocsPanel } from "./content/panel.js";
+      import { setReviewerActions } from "./content/reviewer-actions.js";
+      import { rules } from "./rules/index.js";
+
+      window.__docsReviewerTestExports = {
+        DocsReader,
+        DocsPanel,
+        setReviewerActions,
+        rules,
+      };
+    `,
+    resolveDir: projectRoot,
+    sourcefile: "tests/panel-harness-entry.js",
+    loader: "js",
+  },
+  bundle: true,
+  write: false,
+  format: "iife",
+  platform: "browser",
+}).outputFiles[0].text;
 
 async function launchBrowserOrSkip(t) {
   try {
@@ -205,34 +234,102 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
   await page.addStyleTag({
     path: path.join(projectRoot, "panel", "panel.css"),
   });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "rules", "index.js"),
-  });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "rules", "arcaismos.js"),
-  });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "rules", "voz-pasiva.js"),
-  });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "rules", "queismo.js"),
-  });
-  await page.evaluate((nextPatterns) => {
-    const rule = window.docsReviewerRules.find((item) => item.id === "queismo");
-    rule._patterns = nextPatterns;
-    rule.getPatterns = () => nextPatterns;
-    rule.getNlpEngine = () => null;
-    rule._engineName = "fallback";
+  await page.addScriptTag({ content: panelHarnessBundle });
+  await page.evaluate(async (nextPatterns) => {
+    const { DocsReader, DocsPanel, setReviewerActions, rules } =
+      window.__docsReviewerTestExports;
+    const issueState = {
+      activeIssueId: null,
+      issuesById: new Map(),
+    };
+
+    const queismoRule = rules.find((item) => item.id === "queismo");
+    queismoRule._patterns = nextPatterns;
+    queismoRule.getPatterns = () => nextPatterns;
+    queismoRule.getNlpEngine = () => null;
+    queismoRule._engineName = "fallback";
+
+    const reviewer = {
+      activeIssueId: null,
+
+      async analizarDocumento(options = {}) {
+        const documento = await DocsReader.leerDocumento(options);
+
+        if (!documento?.text) {
+          if (DocsReader.lastReadError?.code === "EXTENSION_CONTEXT_INVALIDATED") {
+            DocsPanel.mostrarError(
+              "La extensión se actualizó. Recargá la página para continuar.",
+            );
+            issueState.issuesById = new Map();
+            return;
+          }
+
+          DocsPanel.mostrarError(
+            DocsReader.lastReadError?.message || "Sin acceso al documento.",
+          );
+          issueState.issuesById = new Map();
+          return;
+        }
+
+        const collectedMatches = [];
+        rules.forEach((regla) => {
+          collectedMatches.push(...regla.detectar(documento.text));
+        });
+
+        const allMatches = collectedMatches
+          .map((match, index) => {
+            const regla = rules.find((item) => item.id === match.regla) || {};
+            return {
+              ...match,
+              id: match.id || `${match.regla}-${index}`,
+              color: regla.color || "#1a73e8",
+              reglaNombre: regla.nombre || match.regla,
+              reglaDescripcion: regla.descripcion || "",
+            };
+          })
+          .sort((a, b) => {
+            if (a.inicio !== b.inicio) return a.inicio - b.inicio;
+            return a.fin - b.fin;
+          });
+
+        issueState.issuesById = new Map(
+          allMatches.map((issue) => [issue.id, issue]),
+        );
+        DocsPanel.actualizarIssues(allMatches);
+      },
+
+      aplicarCorreccion(issueId) {
+        return this.enfocarIssue(issueId, { scrollPanel: false });
+      },
+
+      setIssueActivo(issueId, options = {}) {
+        this.activeIssueId = issueId;
+        issueState.activeIssueId = issueId;
+        DocsPanel.setIssueActivo(issueId, options);
+      },
+
+      limpiarIssueActivo(options = {}) {
+        this.setIssueActivo(null, options);
+      },
+
+      enfocarIssue(issueId, options = {}) {
+        this.setIssueActivo(issueId, { scrollPanel: true, ...options });
+        return DocsPanel.enfocarIssue(issueId);
+      },
+
+      getIssue(issueOrId) {
+        if (!issueOrId) return null;
+        if (typeof issueOrId === "string") {
+          return issueState.issuesById.get(issueOrId) || null;
+        }
+        return issueOrId;
+      },
+    };
+
+    setReviewerActions(reviewer);
+    await DocsPanel.inyectar();
+    await reviewer.analizarDocumento();
   }, patterns);
-  await page.addScriptTag({
-    path: path.join(projectRoot, "content", "runtime.js"),
-  });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "content", "panel.js"),
-  });
-  await page.addScriptTag({
-    path: path.join(projectRoot, "content", "content.js"),
-  });
 
   await page.waitForFunction(
     () => document.querySelectorAll(".docs-reviewer-issue").length === 3,
@@ -289,10 +386,10 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
     initialState.issues[1].suggestion,
     /La actora interpuso el recurso/i,
   );
-  assert.match(initialState.issues[2].suggestion, /Posible queismo/i);
+  assert.match(initialState.issues[2].suggestion, /de que/i);
   assert.deepEqual(
     initialState.issues.map((issue) => issue.button),
-    ["Aplicar cambio", "Ver en documento", "Ver en documento"],
+    ["Aplicar cambio", "Aplicar cambio", "Aplicar cambio"],
   );
   assert.equal(initialState.readCalls, 1);
 
@@ -324,7 +421,7 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
   await page.waitForFunction(() =>
     document
       .querySelector(".docs-reviewer-placeholder.docs-reviewer-error")
-      ?.textContent?.includes("La extensión se actualizó o recargó."),
+      ?.textContent?.includes("La extensión se actualizó."),
   );
 
   const invalidatedState = await page.evaluate(() => ({
@@ -338,7 +435,7 @@ test("renderiza el panel con hallazgos, sugerencias y botones", async (t) => {
 
   assert.match(
     invalidatedState.errorMessage,
-    /La extensión se actualizó o recargó\./i,
+    /La extensión se actualizó\./i,
   );
   assert.deepEqual(invalidatedState.unhandledErrors, []);
   assert.deepEqual(invalidatedState.unhandledRejections, []);

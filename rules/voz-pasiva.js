@@ -1,4 +1,4 @@
-const vozPasivaRule = {
+export const vozPasivaRule = {
   id: "voz-pasiva",
   nombre: "Voz pasiva",
   descripcion: "Reemplaza construcciones pasivas por voz activa más directa",
@@ -208,8 +208,4 @@ const vozPasivaRule = {
   },
 };
 
-// Registrar la regla en el objeto global
-if (typeof window.docsReviewerRules === "undefined") {
-  window.docsReviewerRules = [];
-}
-window.docsReviewerRules.push(vozPasivaRule);
+export default vozPasivaRule;

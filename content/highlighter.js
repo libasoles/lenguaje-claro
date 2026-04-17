@@ -1,4 +1,7 @@
-const DocsHighlighter = {
+import { DocsPanel } from "./panel.js";
+import { getReviewerActions } from "./reviewer-actions.js";
+
+export const DocsHighlighter = {
   overlayElement: null,
   popupElement: null,
   issues: [],
@@ -48,7 +51,7 @@ const DocsHighlighter = {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         this.pinnedIssueId = null;
-        DocsReviewer.limpiarIssueActivo();
+        getReviewerActions().limpiarIssueActivo();
       }
     });
   },
@@ -183,7 +186,7 @@ const DocsHighlighter = {
     this.reanalysisTimer = setTimeout(() => {
       this.reanalysisTimer = null;
       console.log("[Legal Docs] Re-analizando documento tras edición...");
-      DocsReviewer.analizarDocumento();
+      getReviewerActions().analizarDocumento();
     }, 2000);
   },
 
@@ -787,7 +790,7 @@ const DocsHighlighter = {
     if (!this.overlayElement) return;
 
     issueRects.forEach((rects, issueId) => {
-      const issue = DocsReviewer.getIssue(issueId);
+      const issue = getReviewerActions().getIssue(issueId);
       if (!issue || !rects.length) return;
 
       const markers = rects.map((rect) => {
@@ -857,7 +860,7 @@ const DocsHighlighter = {
   handleMarkerEnter(issueId) {
     this.hoverIssueId = issueId;
     this.cancelHidePopup();
-    DocsReviewer.setIssueActivo(issueId, { showPopup: true });
+    getReviewerActions().setIssueActivo(issueId, { showPopup: true });
   },
 
   handleMarkerLeave(issueId, relatedTarget) {
@@ -876,7 +879,10 @@ const DocsHighlighter = {
 
   handleMarkerClick(issueId) {
     this.pinnedIssueId = issueId;
-    DocsReviewer.setIssueActivo(issueId, { showPopup: true, pinPopup: true });
+    getReviewerActions().setIssueActivo(issueId, {
+      showPopup: true,
+      pinPopup: true,
+    });
   },
 
   maybeHidePopup(relatedTarget) {
@@ -887,7 +893,9 @@ const DocsHighlighter = {
     this.cancelHidePopup();
     this.hidePopupTimer = window.setTimeout(() => {
       if (!this.pinnedIssueId && !this.isPopupHovered) {
-        DocsReviewer.limpiarIssueActivo({ preservePinnedPopup: false });
+        getReviewerActions().limpiarIssueActivo({
+          preservePinnedPopup: false,
+        });
       }
     }, 120);
   },
@@ -900,7 +908,7 @@ const DocsHighlighter = {
   },
 
   showPopup(issueId) {
-    const issue = DocsReviewer.getIssue(issueId);
+    const issue = getReviewerActions().getIssue(issueId);
     const rects = this.currentRects.get(issueId) || [];
 
     if (!issue || !rects.length || !this.popupElement) {
@@ -986,7 +994,7 @@ const DocsHighlighter = {
       .querySelector(".docs-reviewer-popup-close")
       ?.addEventListener("click", () => {
         this.pinnedIssueId = null;
-        DocsReviewer.limpiarIssueActivo();
+        getReviewerActions().limpiarIssueActivo();
       });
 
     this.popupElement
@@ -994,7 +1002,7 @@ const DocsHighlighter = {
       .forEach((btn) => {
         btn.addEventListener("click", () => {
           const chosen = btn.dataset.sugerencia || null;
-          DocsReviewer.aplicarCorreccion(issue.id, chosen);
+          getReviewerActions().aplicarCorreccion(issue.id, chosen);
         });
       });
 
@@ -1004,7 +1012,7 @@ const DocsHighlighter = {
         DocsPanel.mostrar();
         DocsPanel.enfocarIssue(issue.id);
         this.pinnedIssueId = issue.id;
-        DocsReviewer.setIssueActivo(issue.id, {
+        getReviewerActions().setIssueActivo(issue.id, {
           showPopup: true,
           pinPopup: true,
           scrollPanel: true,
@@ -1052,7 +1060,7 @@ const DocsHighlighter = {
     }
 
     this.pinnedIssueId = null;
-    DocsReviewer.limpiarIssueActivo();
+    getReviewerActions().limpiarIssueActivo();
   },
 
   getScrollContainer() {
@@ -1490,3 +1498,5 @@ const DocsHighlighter = {
       .replaceAll("'", "&#39;");
   },
 };
+
+export default DocsHighlighter;

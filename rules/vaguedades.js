@@ -1,37 +1,11 @@
-const vaguedadesRule = {
+import { buildAccentInsensitivePattern } from "./shared.js";
+
+export const vaguedadesRule = {
   id: "vaguedades",
   nombre: "Vaguedad",
   descripcion:
     "Reemplaza expresiones vagas por información precisa y verificable",
   color: "#8e44ad", // Violeta
-
-  accentInsensitiveMap: {
-    a: "[aá]",
-    e: "[eé]",
-    i: "[ií]",
-    o: "[oó]",
-    u: "[uúü]",
-    n: "[nñ]",
-  },
-
-  escapeRegexChar(char) {
-    return char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  },
-
-  normalizeAccentChar(char) {
-    return char.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  },
-
-  buildAccentInsensitivePattern(text) {
-    return Array.from(text)
-      .map((char) => {
-        const lowerChar = this.normalizeAccentChar(char).toLocaleLowerCase();
-        return (
-          this.accentInsensitiveMap[lowerChar] || this.escapeRegexChar(char)
-        );
-      })
-      .join("");
-  },
 
   // `precision` explica qué tipo de información concreta reemplazaría la vaguedad.
   // No se puede sugerir un texto exacto, por eso `aplicable: false`.
@@ -100,7 +74,7 @@ const vaguedadesRule = {
     const matches = [];
 
     this.diccionario.forEach((item) => {
-      const pattern = this.buildAccentInsensitivePattern(item.palabrasClaves);
+      const pattern = buildAccentInsensitivePattern(item.palabrasClaves);
       const regex = new RegExp(`\\b${pattern}\\b`, "gi");
       let match;
 
@@ -122,7 +96,4 @@ const vaguedadesRule = {
   },
 };
 
-if (typeof window.docsReviewerRules === "undefined") {
-  window.docsReviewerRules = [];
-}
-window.docsReviewerRules.push(vaguedadesRule);
+export default vaguedadesRule;

@@ -10,7 +10,7 @@ const CONFIDENCE_ORDER = {
   baja: 1,
 };
 
-const queismoRule = {
+export const queismoRule = {
   id: "queismo",
   nombre: "Queismo y dequeismo",
   descripcion:
@@ -353,8 +353,4 @@ const queismoRule = {
   },
 };
 
-// Registrar la regla en el objeto global
-if (typeof window.docsReviewerRules === "undefined") {
-  window.docsReviewerRules = [];
-}
-window.docsReviewerRules.push(queismoRule);
+export default queismoRule;

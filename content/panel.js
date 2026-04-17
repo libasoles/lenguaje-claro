@@ -1,4 +1,9 @@
-const DocsPanel = {
+import { DocsReader } from "./reader.js";
+import { DocsRuntime } from "./runtime.js";
+import { getReviewerActions } from "./reviewer-actions.js";
+import { rules } from "../rules/index.js";
+
+export const DocsPanel = {
   panelElement: null,
   issuesContainer: null,
   issueElements: new Map(),
@@ -59,9 +64,7 @@ const DocsPanel = {
 
     const reanalBtn = document.getElementById("docs-reviewer-reanalizar");
     if (reanalBtn) {
-      reanalBtn.addEventListener("click", () =>
-        DocsReviewer.analizarDocumento(),
-      );
+      reanalBtn.addEventListener("click", () => getReviewerActions().analizarDocumento());
     }
   },
 
@@ -99,7 +102,7 @@ const DocsPanel = {
     document
       .getElementById("docs-reviewer-auth-btn")
       .addEventListener("click", () => {
-        DocsReviewer.analizarDocumento({ interactive: true });
+        getReviewerActions().analizarDocumento({ interactive: true });
       });
   },
 
@@ -131,7 +134,7 @@ const DocsPanel = {
       porRegla[match.regla].push(match);
     });
 
-    window.docsReviewerRules.forEach((regla) => {
+    rules.forEach((regla) => {
       const issues = porRegla[regla.id] || [];
       if (!issues.length) return;
 
@@ -194,7 +197,7 @@ const DocsPanel = {
             btn.textContent = s;
             btn.addEventListener("click", (event) => {
               event.stopPropagation();
-              DocsReviewer.aplicarCorreccion(issue.id, s);
+              getReviewerActions().aplicarCorreccion(issue.id, s);
             });
             buttonGroup.appendChild(btn);
           });
@@ -207,20 +210,20 @@ const DocsPanel = {
             : "Ver en documento";
           buttonElement.addEventListener("click", (event) => {
             event.stopPropagation();
-            DocsReviewer.aplicarCorreccion(issue.id);
+            getReviewerActions().aplicarCorreccion(issue.id);
           });
           issueDiv.appendChild(buttonElement);
         }
         issueDiv.addEventListener("mouseenter", () => {
-          DocsReviewer.setIssueActivo(issue.id, { showPopup: false });
+          getReviewerActions().setIssueActivo(issue.id, { showPopup: false });
         });
         issueDiv.addEventListener("mouseleave", () => {
-          if (DocsReviewer.activeIssueId === issue.id) {
-            DocsReviewer.limpiarIssueActivo({ preservePinnedPopup: true });
+          if (getReviewerActions().activeIssueId === issue.id) {
+            getReviewerActions().limpiarIssueActivo({ preservePinnedPopup: true });
           }
         });
         issueDiv.addEventListener("click", () => {
-          DocsReviewer.enfocarIssue(issue.id, {
+          getReviewerActions().enfocarIssue(issue.id, {
             showPopup: true,
             pinPopup: true,
             scrollPanel: false,
@@ -308,3 +311,5 @@ const DocsPanel = {
     }
   },
 };
+
+export default DocsPanel;

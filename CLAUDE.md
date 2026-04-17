@@ -9,23 +9,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Setup
 
 - **Node.js version**: 22 (specified in `.nvmrc`)
-- **No bundling step**: The extension runs directly from source files, but `manifest.json` is generated from `manifest.template.json`
+- **Build step**: `npm run build` genera `dist/` con bundles + assets para cargar la extensión
 - **Manifest Version**: 3 (Chrome's current standard)
 
 To load the extension for development:
 1. Open `chrome://extensions` in Chrome
 2. Enable "Developer mode"
-3. Click "Load unpacked" and select the project directory
+3. Run `npm run build` or keep `npm run watch` running
+4. Click "Load unpacked" and select the `dist/` directory
 4. The extension auto-initializes when you open a Google Docs document
 
 ### OAuth Configuration
 
-The extension uses Google OAuth to access the Google Docs API. The OAuth client ID should be managed via `.env`, and `manifest.json` is generated from `manifest.template.json`:
+The extension uses Google OAuth to access the Google Docs API. The OAuth client ID should be managed via `.env`, and the generated manifest is built from `manifest.template.json`:
 
 1. Copy `.env.example` to `.env` (if not already done)
 2. Update the `CHROME_OAUTH_CLIENT_ID` value in `.env` with your OAuth client ID from [Google Cloud Console](https://console.cloud.google.com)
-3. Run `npm run build` to generate `manifest.json`
-4. The `.env` file and generated `manifest.json` are git-ignored (see `.gitignore`)
+3. Run `npm run build` to generate `dist/manifest.json`
+4. The `.env` file and generated `dist/` directory are git-ignored (see `.gitignore`)
 
 ## Architecture
 
@@ -49,9 +50,9 @@ The extension follows a modular design with four main layers:
 - Renders inline markers plus a contextual popup with hover/click interactions
 
 ### 4. **Rule System** (`rules/`)
-Each rule file exports an object to `window.docsReviewerRules[]` with this structure:
+Each rule file exports a rule object, and `rules/index.js` aggregates the exported rules:
 ```javascript
-const ruleObject = {
+export const ruleObject = {
   id: 'unique-id',           // Used in logs and element attributes
   nombre: 'Display Name',     // Shown to users
   descripcion: 'What it does',
@@ -69,9 +70,11 @@ const ruleObject = {
     }];
   }
 };
+
+export default ruleObject;
 ```
 
-**Order matters**: Rules load in `manifest.json`'s script order. Both regex patterns use case-insensitive matching with word boundaries (`\b`) by default.
+`rules/index.js` is the source of truth for registration order. Both regex patterns use case-insensitive matching with word boundaries (`\b`) by default.
 
 ### 5. **UI Panel** (`content/panel.js`, `panel/`)
 - `DocsPanel` object: Manages the floating sidebar
@@ -91,8 +94,8 @@ const ruleObject = {
 
 1. Create `rules/new-rule.js` in the rules directory
 2. Define the rule object (see Rule System section above)
-3. Register it to `window.docsReviewerRules` (the template handles this automatically)
-4. Add the script to `manifest.json` in `content_scripts[0].js` (order: before `content.js`)
+3. Export it from the file
+4. Import it in `rules/index.js` and append it to the exported `rules` array
 
 **Example**: To detect repeated words:
 - Use `regex.exec()` in a loop to find all matches with their positions
@@ -121,12 +124,12 @@ const ruleObject = {
 - Console logs are prefixed with `[Docs Reviewer]`
 - Browser DevTools (F12) shows script errors and rule execution logs
 - If extension doesn't load: check that you're on `docs.google.com` and reload the page
-- If highlights don't appear: verify rule is in `window.docsReviewerRules` and positions are correct
+- If highlights don't appear: verify the rule is exported in `rules/index.js` and positions are correct
 
 ## Manifest Structure
 
 - **Manifest Version**: 3
 - **Content Scripts**: Injected into `https://docs.google.com/*`
 - **Run At**: `document_idle`
-- **Script Load Order**: Rules first, then readers/highlighters/panel, then orchestration (`content.js`)
+- **Build Output**: Chrome loads the generated files from `dist/`
 - **Permissions**: `storage`, `identity`

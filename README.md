@@ -31,20 +31,28 @@ cd lenguaje-claro
 source ~/.nvm/nvm.sh && nvm use 22
 ```
 
-### 2. Generar el manifest
+### 2. Generar `dist/`
 
 ```bash
 npm run build
 ```
 
-Este paso crea `manifest.json` a partir de `manifest.template.json` e inyecta `CHROME_OAUTH_CLIENT_ID` desde `.env`.
+Este paso genera `dist/manifest.json`, bundlea los scripts de la extensión y copia los assets estáticos necesarios a `dist/`.
+
+Durante desarrollo podés dejar recompilando en segundo plano:
+
+```bash
+npm run watch
+```
+
+`watch` actualiza los bundles y los artefactos estáticos en `dist/`, pero Chrome igual requiere recargar la extensión y normalmente también la pestaña de Google Docs para tomar los cambios.
 
 ### 3. Cargar la extensión en Chrome
 
 1. Abrir Chrome y navegar a `chrome://extensions`
 2. Activar "Modo de desarrollador" (esquina superior derecha)
 3. Hacer clic en "Cargar extensión sin empaquetar"
-4. Seleccionar la carpeta `lenguaje-claro`
+4. Seleccionar la carpeta `lenguaje-claro/dist`
 
 ### 4. Usar la extensión
 
@@ -61,15 +69,16 @@ Este paso crea `manifest.json` a partir de `manifest.template.json` e inyecta `C
 
 ```
 lenguaje-claro/
-├── manifest.json              # Configuración de la extensión (Manifest V3)
+├── dist/                      # Artefactos generados que se cargan en Chrome
 ├── .nvmrc                     # Node.js v22
 ├── content/
-│   ├── content.js             # Entry point principal
+│   ├── index.js               # Entry point bundleado del content script aislado
+│   ├── content.js             # Orquestación principal
 │   ├── reader.js              # Lee el texto de Google Docs
 │   ├── highlighter.js         # Crea overlays visuales
 │   └── panel.js               # Gestiona el panel flotante
 ├── rules/
-│   ├── index.js               # Inicialización
+│   ├── index.js               # Registro central de reglas
 │   ├── arcaismos.js           # Regla 1
 │   ├── voz-pasiva.js          # Regla 2
 │   └── queismo.js             # Regla 3
@@ -86,10 +95,10 @@ lenguaje-claro/
 Para agregar una nueva regla de escritura:
 
 1. Crear un archivo `rules/nueva-regla.js`
-2. Definir un objeto con la siguiente estructura:
+2. Exportar un objeto con la siguiente estructura:
 
 ```javascript
-const nuevaReglaRule = {
+export const nuevaReglaRule = {
   id: "nueva-regla",
   nombre: "Nombre legible",
   descripcion: "Descripción de qué detecta",
@@ -102,13 +111,11 @@ const nuevaReglaRule = {
   },
 };
 
-if (typeof window.docsReviewerRules === "undefined") {
-  window.docsReviewerRules = [];
-}
-window.docsReviewerRules.push(nuevaReglaRule);
+export default nuevaReglaRule;
 ```
 
-1. Agregar el script a `manifest.json` en `content_scripts[0].js`
+3. Importar la nueva regla en `rules/index.js` y agregarla al array `rules`
+4. Correr `npm run build` o dejar `npm run watch` activo
 
 ### Tests
 
@@ -154,6 +161,8 @@ Ese e2e monta una página fixture, ejecuta el flujo completo de análisis y veri
 
 ### La extensión no aparece
 
+- Verificar que `dist/` esté generado con `npm run build`
+- Verificar que Chrome cargó `dist/` y no la raíz del proyecto
 - Verificar que se está en `docs.google.com`
 - Recargar la página (F5)
 - Verificar la consola del navegador (F12 → Console) para mensajes de error
@@ -162,7 +171,7 @@ Ese e2e monta una página fixture, ejecuta el flujo completo de análisis y veri
 
 - Verificar que el texto contiene los patrones esperados
 - Revisar la consola para logs de depuración
-- Verificar que las reglas están cargadas correctamente
+- Verificar que la regla fue exportada e incluida en `rules/index.js`
 
 ### El panel no responde
 

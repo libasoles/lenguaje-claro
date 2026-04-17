@@ -2,10 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const vm = require("node:vm");
+const { loadBrowserModule } = require("./helpers/load-browser-module.js");
 
 const projectRoot = path.resolve(__dirname, "..");
-const patterns = require(path.join(projectRoot, "rules", "patterns.json"));
+const patterns = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "rules", "patterns.json"), "utf8"),
+);
 
 function getPatternEntry(group, id) {
   const entry = patterns[group].find((item) => item.id === id);
@@ -14,22 +16,25 @@ function getPatternEntry(group, id) {
 }
 
 function loadQueismoRule() {
-  const source = fs.readFileSync(
-    path.join(projectRoot, "rules", "queismo.js"),
-    "utf8",
-  );
-
-  const sandbox = {
-    console,
-    window: {
-      docsReviewerRules: [],
+  const { exports } = loadBrowserModule({
+    projectRoot,
+    filename: "tests/queismo-entry.js",
+    source: `export { queismoRule } from "./rules/queismo.js";`,
+    sandbox: {
+      console,
+      window: {},
+      chrome: {
+        runtime: {
+          getURL(resourcePath) {
+            return `chrome-extension://test/${resourcePath}`;
+          },
+        },
+      },
+      XMLHttpRequest: function XMLHttpRequest() {},
     },
-  };
+  });
 
-  vm.createContext(sandbox);
-  vm.runInContext(source, sandbox, { filename: "rules/queismo.js" });
-
-  const rule = sandbox.window.docsReviewerRules.find((item) => item.id === "queismo");
+  const rule = exports.queismoRule;
   assert.ok(rule, "No se pudo cargar la regla de queismo");
   rule._patterns = patterns;
   rule.getPatterns = () => patterns;

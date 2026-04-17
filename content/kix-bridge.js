@@ -8,6 +8,8 @@
 // Como los nombres internos del editor cambian con los updates de Docs, también
 // monitoreamos candidatos alternativos y logueamos todo para facilitar el reverse.
 
+import "./canvas-patcher.js";
+
 (function () {
   'use strict';
 

@@ -1,14 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const path = require("node:path");
-const vm = require("node:vm");
+const { loadBrowserModule } = require("./helpers/load-browser-module.js");
 
 const projectRoot = path.resolve(__dirname, "..");
-const highlighterSource = fs.readFileSync(
-  path.join(projectRoot, "content", "highlighter.js"),
-  "utf8",
-);
 
 function loadHighlighter() {
   const measureContext = {
@@ -42,13 +37,14 @@ function loadHighlighter() {
     window: {},
   };
 
-  vm.createContext(sandbox);
-  vm.runInContext(
-    `${highlighterSource}\nthis.__DocsHighlighter = DocsHighlighter;`,
+  const { exports } = loadBrowserModule({
+    projectRoot,
     sandbox,
-    { filename: "content/highlighter.js" },
-  );
-  return sandbox.__DocsHighlighter;
+    filename: "tests/highlighter-entry.js",
+    source: `export { DocsHighlighter } from "./content/highlighter.js";`,
+  });
+
+  return exports.DocsHighlighter;
 }
 
 test("mergeIssueRects conserva rects DOM y completa faltantes desde canvas", () => {

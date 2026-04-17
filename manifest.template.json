@@ -1,5 +1,5 @@
 {
-  "_comment": "Edita aqui y luego corre `npm run build` para generar manifest.json con el client ID tomado de .env.",
+  "_comment": "Edita aqui y luego corre `npm run build` para generar `dist/manifest.json` con el client ID tomado de .env.",
   "manifest_version": 3,
   "name": "Lenguaje claro",
   "version": "0.1.0",
@@ -28,7 +28,7 @@
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/*"],
-      "js": ["content/canvas-patcher.js", "content/kix-bridge.js"],
+      "js": ["content/kix-bridge.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },
@@ -37,18 +37,7 @@
       "js": [
         "vendor/compromise.min.js",
         "vendor/es-compromise.min.js",
-        "rules/index.js",
-        "rules/arcaismos.js",
-        "rules/tecnicismos.js",
-        "rules/vaguedades.js",
-        "rules/voz-pasiva.js",
-        "rules/queismo.js",
-        "content/runtime.js",
-        "content/reader.js",
-        "content/docs-editor.js",
-        "content/highlighter.js",
-        "content/panel.js",
-        "content/content.js"
+        "content/index.js"
       ],
       "css": ["panel/panel.css"],
       "run_at": "document_idle"

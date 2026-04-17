@@ -6,7 +6,7 @@
 // desde REST batchUpdate ocurrirá cuando el spike identifique el método
 // interno del editor que aplica cambios undoable.
 
-const DocsEditor = {
+export const DocsEditor = {
   isBridgeReady: false,
   _bridgeSource: null,
 
@@ -35,4 +35,5 @@ const DocsEditor = {
 };
 
 DocsEditor.init();
-window.DocsEditor = DocsEditor;
+
+export default DocsEditor;

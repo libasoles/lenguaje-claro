@@ -1,7 +1,9 @@
 // reader.js - Extrae texto del documento vía la Google Docs API (a través del background)
 // Google Docs migró a canvas-based rendering, por lo que el DOM ya no contiene el texto.
 
-const DocsReader = {
+import { DocsRuntime } from "./runtime.js";
+
+export const DocsReader = {
   lastReadError: null,
 
   // Obtiene el ID del documento desde la URL actual
@@ -69,3 +71,5 @@ const DocsReader = {
     return Promise.resolve(!!this.getDocumentId());
   },
 };
+
+export default DocsReader;
