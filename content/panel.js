@@ -176,10 +176,16 @@ const DocsPanel = {
           issueDiv.appendChild(suggestionElement);
         }
 
+        const PLACEHOLDER_SUGGESTIONS = [
+          "(simplifica dividiendo en múltiples oraciones)",
+          "(considera usar voz activa)",
+        ];
+        const canApplyFromPanel =
+          issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
+
         const buttonElement = document.createElement("button");
         buttonElement.className = "docs-reviewer-issue-button";
-        buttonElement.textContent =
-          issue.regla === "arcaismos" ? "Aplicar cambio" : "Ver en documento";
+        buttonElement.textContent = canApplyFromPanel ? "Aplicar cambio" : "Ver en documento";
         buttonElement.addEventListener("click", (event) => {
           event.stopPropagation();
           DocsReviewer.aplicarCorreccion(issue.id);

@@ -325,13 +325,18 @@ const queismoRule = {
             tipoHallazgo === "dequeismo"
               ? "Posible dequeismo"
               : "Posible queismo";
+          const textoOriginal = sourceText.slice(absoluteStart, absoluteEnd);
+          const sugerencia =
+            tipoHallazgo === "queismo"
+              ? textoOriginal.replace(/\bque$/i, "de que")
+              : textoOriginal.replace(/\bde\s+que$/i, "que");
 
           matches.push({
             id: `${this.id}-${tipoHallazgo}-${entry.id || "pattern"}-${absoluteStart}-${absoluteEnd}`,
             inicio: absoluteStart,
             fin: absoluteEnd,
-            textoOriginal: sourceText.slice(absoluteStart, absoluteEnd),
-            sugerencia: uxTitle,
+            textoOriginal,
+            sugerencia,
             regla: this.id,
             descripcion: `${uxTitle} en ${label}. Confianza ${severidad}.`,
             tipoHallazgo,

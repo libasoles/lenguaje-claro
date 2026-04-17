@@ -904,7 +904,11 @@ const DocsHighlighter = {
   },
 
   renderPopupHTML(issue) {
-    const canApply = issue.regla === "arcaismos" && issue.sugerencia;
+    const PLACEHOLDER_SUGGESTIONS = [
+      "(simplifica dividiendo en múltiples oraciones)",
+      "(considera usar voz activa)",
+    ];
+    const canApply = issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
     const safeRuleName = this.escapeHTML(issue.reglaNombre);
     const safeDescription = this.escapeHTML(issue.descripcion);
     const safeOriginal = this.escapeHTML(issue.textoOriginal);
@@ -914,6 +918,7 @@ const DocsHighlighter = {
       issue.sugerencia !== "(considera usar voz activa)"
         ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
         : "";
+    const logoUrl = chrome.runtime.getURL("assets/icons/logo.png");
 
     return `
       <div class="docs-reviewer-popup-header">
@@ -925,13 +930,13 @@ const DocsHighlighter = {
         <div class="docs-reviewer-popup-original">${safeOriginal}</div>
         ${suggestionHTML}
       </div>
+      ${canApply ? `
       <div class="docs-reviewer-popup-actions">
-        ${
-          canApply
-            ? '<button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>'
-            : ""
-        }
-        <button type="button" class="docs-reviewer-popup-button" data-action="panel">Ir al panel</button>
+        <button type="button" class="docs-reviewer-popup-button docs-reviewer-popup-button-primary" data-action="apply">Aplicar cambio</button>
+      </div>` : ""}
+      <div class="docs-reviewer-popup-footer">
+        <img src="${logoUrl}" class="docs-reviewer-popup-logo" alt="">
+        <button type="button" class="docs-reviewer-popup-footer-link" data-action="panel">Ver más</button>
       </div>
     `;
   },
@@ -953,6 +958,7 @@ const DocsHighlighter = {
     this.popupElement
       .querySelector('[data-action="panel"]')
       ?.addEventListener("click", () => {
+        DocsPanel.mostrar();
         DocsPanel.enfocarIssue(issue.id);
         this.pinnedIssueId = issue.id;
         DocsReviewer.setIssueActivo(issue.id, {

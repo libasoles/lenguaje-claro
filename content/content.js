@@ -250,7 +250,11 @@ const DocsReviewer = {
     const issue = this.getIssue(issueOrId);
     if (!issue) return;
 
-    if (issue.regla === "arcaismos" && issue.sugerencia) {
+    const PLACEHOLDER_SUGGESTIONS = [
+      "(simplifica dividiendo en múltiples oraciones)",
+      "(considera usar voz activa)",
+    ];
+    if (issue.sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia)) {
       const docId = DocsReader.getDocumentId();
       if (!docId) return;
 
@@ -317,9 +321,9 @@ const DocsReviewer = {
       }
 
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       void this.deshacerUltimoCambio();
-    });
+    }, true);
   },
 
   async deshacerUltimoCambio() {
