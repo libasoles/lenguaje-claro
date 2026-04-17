@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:e2e": "node --test tests/panel.e2e.test.js"
   },
   "devDependencies": {
     "playwright": "^1.59.1"

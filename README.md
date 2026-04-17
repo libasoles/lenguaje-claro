@@ -1,6 +1,6 @@
 # Lenguaje claro - Extensión Chrome para Google Docs
 
-Una extensión de Chrome que se enfoca en reglas de escritura jurídica en el marco de lenguaje claro.
+Una extensión de Chrome que se enfoca en reglas de escritura jurídica en el marco del lenguaje claro.
 
 Revisa y mejora la escritura en Google Docs, detectando problemas de estilo y sugiriendo mejoras. Es similar a Grammarly, ProWritingAid o Hemingway App pero pensada para profesionales del derecho.
 
@@ -109,6 +109,14 @@ npm test
 ```
 
 La suite actual valida que los patrones curados de queísmo/dequeísmo compilan y que los matchers clave siguen detectando los casos esperados.
+
+Para validar la UI del panel con navegador real:
+
+```bash
+npm run test:e2e
+```
+
+Ese e2e monta una página fixture, ejecuta el flujo completo de análisis y verifica que el panel muestre issues, sugerencias y botones.
 
 ## Notas Técnicas
 
