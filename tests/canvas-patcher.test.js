@@ -79,6 +79,14 @@ function loadCanvasPatcher() {
   }
 
   const document = createEventTarget();
+  const window = createEventTarget();
+  window.postMessage = function (data) {
+    this.dispatchEvent({
+      type: "message",
+      source: window,
+      data,
+    });
+  };
 
   const sandbox = {
     console,
@@ -87,6 +95,7 @@ function loadCanvasPatcher() {
     Event,
     CustomEvent,
     document,
+    window,
     performance: {
       now() {
         return now;
@@ -111,6 +120,7 @@ function loadCanvasPatcher() {
   return {
     CanvasRenderingContext2D,
     document,
+    window,
     setNow(value) {
       now = value;
       runDueTimers();

@@ -16,10 +16,14 @@ export const DocsHighlighter = {
   hidePopupTimer: null,
   mutationObserver: null,
   reanalysisTimer: null,
-  bootstrapRetryTimer: null,
-  bootstrapRetryDeadline: 0,
+  bootstrapRetryTimers: [],
   _recalcGeneration: 0,
   _measureCanvas: null,
+  _lastCanvasMappingStats: null,
+  _debugSessionId: null,
+  _debugStartedAt: 0,
+  _debugRecalcCount: 0,
+  _debugLastMissingTextRootAt: 0,
 
   inicializar() {
     if (this.overlayElement && this.popupElement) return;
@@ -46,11 +50,16 @@ export const DocsHighlighter = {
     document.body.appendChild(this.overlayElement);
     document.body.appendChild(this.popupElement);
 
-    window.addEventListener("resize", () => this.scheduleRecalculate());
-    window.addEventListener("scroll", () => this.scheduleRecalculate(), true);
-    document.addEventListener("docs-reviewer-canvas-rendered", () => {
+    window.addEventListener("resize", () => this.scheduleRecalculate("resize"));
+    window.addEventListener(
+      "scroll",
+      () => this.scheduleRecalculate("scroll"),
+      true,
+    );
+    document.addEventListener("docs-reviewer-canvas-rendered", (event) => {
       if (!this.issues?.length) return;
-      this.scheduleRecalculate();
+      this.logDebug("canvas-rendered-event", event.detail || {});
+      this.scheduleRecalculate("canvas-rendered");
     });
     document.addEventListener("click", (event) =>
       this.handleDocumentClick(event),
@@ -69,14 +78,42 @@ export const DocsHighlighter = {
     this.pinnedIssueId = null;
     this.hoverIssueId = null;
     this.activeIssueId = null;
+    this.startDebugSession({ issueCount: this.issues.length });
     this.renderMarkers(new Map());
 
     // No bloquear el primer render esperando el text root: en Google Docs
     // el contenido suele entrar primero por canvas y el fallback ya puede ubicar rects.
-    this.scheduleRecalculate();
+    this.scheduleRecalculate("initial-bootstrap");
     this.observeTextRoot();
     this.scheduleBootstrapRetry();
     void this.ensureTextRootObservation();
+  },
+
+  getDebugNow() {
+    if (typeof performance !== "undefined" && performance?.now) {
+      return performance.now();
+    }
+    return Date.now();
+  },
+
+  startDebugSession(detail = {}) {
+    this._debugSessionId = `${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+    this._debugStartedAt = this.getDebugNow();
+    this._debugRecalcCount = 0;
+    this._debugLastMissingTextRootAt = 0;
+    this.logDebug("session-start", detail);
+  },
+
+  logDebug(stage, detail = {}) {
+    const startedAt = this._debugStartedAt || this.getDebugNow();
+    console.log("[Legal Docs][Highlighter]", {
+      session: this._debugSessionId,
+      t: Math.round((this.getDebugNow() - startedAt) * 10) / 10,
+      stage,
+      ...detail,
+    });
   },
 
   limpiar() {
@@ -101,6 +138,7 @@ export const DocsHighlighter = {
     });
     this.issueMarkers.clear();
     this.hidePopup();
+    this.logDebug("session-cleared");
   },
 
   async recalcularPosiciones() {
@@ -111,6 +149,12 @@ export const DocsHighlighter = {
     }
 
     const generation = ++this._recalcGeneration;
+    const recalcCount = ++this._debugRecalcCount;
+    this.logDebug("recalc-start", {
+      generation,
+      recalcCount,
+      issueCount: this.issues.length,
+    });
     let domIssueRects = null;
 
     // Try DOM approach first — works when accessibility mode is enabled in GDocs.
@@ -120,7 +164,7 @@ export const DocsHighlighter = {
       if (textModel.normalizedText.length > 0) {
         domIssueRects = this.mapIssuesToRects(textModel);
         const visibleIssues = this.countVisibleIssueRects(domIssueRects);
-        console.log("[Legal Docs] Highlighter (DOM):", {
+        this.logDebug("dom-pass", {
           root:
             textRoot.getAttribute("role") ||
             textRoot.className ||
@@ -136,9 +180,10 @@ export const DocsHighlighter = {
           return;
         }
 
-        console.log(
-          "[Legal Docs] Highlighter (DOM): incomplete coverage, trying canvas fallback",
-        );
+        this.logDebug("dom-incomplete-coverage", {
+          visibleIssues,
+          issueCount: this.issues.length,
+        });
       }
     }
 
@@ -147,9 +192,9 @@ export const DocsHighlighter = {
     if (generation !== this._recalcGeneration) return;
 
     if (!canvasData.length) {
-      console.log(
-        "[Legal Docs] Highlighter: no text root and no canvas fragments",
-      );
+      this.logDebug("canvas-empty", {
+        hadTextRoot: Boolean(textRoot),
+      });
       this.renderMarkers(domIssueRects || new Map());
       return;
     }
@@ -165,22 +210,30 @@ export const DocsHighlighter = {
       canvasIssueRects,
     );
     const visibleIssues = this.countVisibleIssueRects(mergedIssueRects);
-    console.log("[Legal Docs] Highlighter (canvas):", {
+    this.logDebug("canvas-pass", {
       canvases: canvasData.length,
       fragments: sortedFragments.length,
       modelLength: canvasTextModel.normalizedText.length,
       issues: this.issues.length,
       visibleIssues,
     });
+    if (this._lastCanvasMappingStats) {
+      this.logDebug("canvas-map-summary", this._lastCanvasMappingStats);
+    }
     if (generation === this._recalcGeneration) {
       this.renderMarkers(mergedIssueRects);
     }
   },
 
-  scheduleRecalculate() {
-    if (this.recalcFrame) return;
+  scheduleRecalculate(reason = "unknown") {
+    if (this.recalcFrame) {
+      this.logDebug("recalc-coalesced", { reason });
+      return;
+    }
+    this.logDebug("recalc-scheduled", { reason });
     this.recalcFrame = requestAnimationFrame(() => {
       this.recalcFrame = 0;
+      this.logDebug("recalc-frame-fired", { reason });
       this.recalcularPosiciones();
     });
   },
@@ -188,9 +241,7 @@ export const DocsHighlighter = {
   ensureTextRootObservation(timeout = 5000) {
     return this.waitForTextRoot(timeout).then((textRoot) => {
       if (!textRoot) {
-        console.log(
-          "[Legal Docs] aplicarHighlights: Could not find text root during bootstrap",
-        );
+        this.logDebug("text-root-bootstrap-timeout", { timeout });
         return null;
       }
 
@@ -199,52 +250,43 @@ export const DocsHighlighter = {
       }
 
       this.observeTextRoot();
-      this.scheduleRecalculate();
+      this.scheduleRecalculate("text-root-ready");
       return textRoot;
     });
   },
 
   clearBootstrapRetry() {
-    if (this.bootstrapRetryTimer) {
-      clearTimeout(this.bootstrapRetryTimer);
-      this.bootstrapRetryTimer = null;
+    if (!Array.isArray(this.bootstrapRetryTimers)) {
+      this.bootstrapRetryTimers = [];
+      return;
     }
-    this.bootstrapRetryDeadline = 0;
+
+    this.bootstrapRetryTimers.forEach((timerId) => {
+      clearTimeout(timerId);
+    });
+    this.bootstrapRetryTimers = [];
   },
 
-  shouldRetryBootstrap() {
-    return (
-      Array.isArray(this.issues) &&
-      this.issues.length > 0 &&
-      this.countVisibleIssueRects(this.currentRects) === 0
-    );
-  },
-
-  scheduleBootstrapRetry({ intervalMs = 250, durationMs = 4000 } = {}) {
+  scheduleBootstrapRetry({ delaysMs = [120, 300, 700, 1400, 2600, 4200] } = {}) {
     this.clearBootstrapRetry();
-    if (!this.shouldRetryBootstrap()) return;
+    if (!Array.isArray(this.issues) || this.issues.length === 0) return;
 
-    this.bootstrapRetryDeadline = Date.now() + durationMs;
-
-    const retry = () => {
-      this.bootstrapRetryTimer = null;
-
-      if (!this.shouldRetryBootstrap()) {
-        this.clearBootstrapRetry();
-        return;
-      }
-
-      this.scheduleRecalculate();
-
-      if (Date.now() >= this.bootstrapRetryDeadline) {
-        this.clearBootstrapRetry();
-        return;
-      }
-
-      this.bootstrapRetryTimer = setTimeout(retry, intervalMs);
-    };
-
-    this.bootstrapRetryTimer = setTimeout(retry, intervalMs);
+    const recalcGeneration = this._recalcGeneration;
+    this.logDebug("bootstrap-retries-armed", {
+      delaysMs,
+      recalcGeneration,
+    });
+    this.bootstrapRetryTimers = delaysMs.map((delayMs) =>
+      setTimeout(() => {
+        if (!this.issues?.length) return;
+        if (this._recalcGeneration < recalcGeneration) return;
+        this.logDebug("bootstrap-retry-fired", {
+          delayMs,
+          recalcGeneration,
+        });
+        this.scheduleRecalculate(`bootstrap-${delayMs}`);
+      }, delayMs),
+    );
   },
 
   scheduleReanalysis() {
@@ -308,17 +350,15 @@ export const DocsHighlighter = {
       const check = () => {
         const root = this.getTextRootSync();
         if (root) {
-          console.log(
-            `[Legal Docs] waitForTextRoot: Found after ${Date.now() - startTime}ms`,
-          );
+          this.logDebug("text-root-wait-found", {
+            waitedMs: Date.now() - startTime,
+          });
           resolve(root);
           return;
         }
 
         if (Date.now() - startTime > timeout) {
-          console.log(
-            `[Legal Docs] waitForTextRoot: Timeout after ${timeout}ms`,
-          );
+          this.logDebug("text-root-wait-timeout", { timeout });
           resolve(null);
           return;
         }
@@ -348,38 +388,62 @@ export const DocsHighlighter = {
       '[role="main"] [role="textbox"]',
       '[role="document"]',
       '[role="textbox"]',
-      ".kix-appview-editor",
-      ".kix-appview",
     ];
+
+    let bestCandidate = null;
 
     for (const selector of candidates) {
       const elements = Array.from(document.querySelectorAll(selector));
       for (const element of elements) {
-        if (this.hasVisibleText(element)) {
-          console.log(
-            `[Legal Docs] Found text root with selector: ${selector}`,
-          );
-          return element;
+        const visibleTextLength = this.getVisibleTextLength(element);
+        if (!visibleTextLength) continue;
+
+        if (
+          !bestCandidate ||
+          visibleTextLength > bestCandidate.visibleTextLength
+        ) {
+          bestCandidate = {
+            element,
+            selector,
+            visibleTextLength,
+          };
         }
       }
     }
 
-    console.log("[Legal Docs] No suitable text root found");
+    if (bestCandidate) {
+      this.logDebug("text-root-found", {
+        selector: bestCandidate.selector,
+        visibleTextLength: bestCandidate.visibleTextLength,
+      });
+      return bestCandidate.element;
+    }
+
+    const now = this.getDebugNow();
+    if (now - this._debugLastMissingTextRootAt > 500) {
+      this._debugLastMissingTextRootAt = now;
+      this.logDebug("text-root-missing");
+    }
     return null;
   },
 
   hasVisibleText(root) {
-    if (!root) return false;
+    return this.getVisibleTextLength(root) > 0;
+  },
+
+  getVisibleTextLength(root, maxChars = 4000) {
+    if (!root) return 0;
 
     const style = window.getComputedStyle(root);
     if (style.display === "none" || style.visibility === "hidden") {
-      return false;
+      return 0;
     }
 
     if (root.getAttribute?.("aria-hidden") === "true") {
-      return false;
+      return 0;
     }
 
+    let visibleChars = 0;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         if (!node.textContent?.trim()) {
@@ -402,7 +466,15 @@ export const DocsHighlighter = {
       },
     });
 
-    return Boolean(walker.nextNode());
+    let currentNode;
+    while ((currentNode = walker.nextNode())) {
+      visibleChars += currentNode.textContent.trim().length;
+      if (visibleChars >= maxChars) {
+        return maxChars;
+      }
+    }
+
+    return visibleChars;
   },
 
   observeTextRoot() {
@@ -413,10 +485,17 @@ export const DocsHighlighter = {
 
     const textRoot = this.getTextRoot();
     if (!textRoot) return;
+    this.logDebug("text-root-observer-attached", {
+      root:
+        textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
+    });
 
     this.mutationObserver = new MutationObserver((mutations) => {
       // Always reposition overlays — layout may have shifted.
-      this.scheduleRecalculate();
+      this.logDebug("text-root-mutation", {
+        mutations: mutations.length,
+      });
+      this.scheduleRecalculate("text-root-mutation");
 
       // Fire re-analysis only for actual text content changes.
       const hasTextChange = mutations.some((mutation) => {
@@ -847,10 +926,14 @@ export const DocsHighlighter = {
   renderMarkers(issueRects) {
     this.currentRects = issueRects;
     this.syncIssuesWithRects(issueRects);
-
-    if (!this.shouldRetryBootstrap()) {
-      this.clearBootstrapRetry();
-    }
+    this.logDebug("render-markers", {
+      visibleIssues: this.countVisibleIssueRects(issueRects),
+      issueCount: this.issues.length,
+      markerGroups:
+        issueRects instanceof Map
+          ? Array.from(issueRects.values()).filter((rects) => rects?.length).length
+          : 0,
+    });
 
     this.issueMarkers.forEach((markers) => {
       markers.forEach((marker) => marker.remove());
@@ -1181,14 +1264,41 @@ export const DocsHighlighter = {
 
   requestCanvasFragments(timeout = 800) {
     return new Promise((resolve) => {
-      const handler = (event) => {
-        document.removeEventListener("docs-reviewer-fragments-data", handler);
-        resolve(event.detail || []);
+      this.logDebug("canvas-fragments-requested", { timeout });
+      let settled = false;
+      let timeoutId;
+      const finish = (detail) => {
+        if (settled) return;
+        settled = true;
+        document.removeEventListener("docs-reviewer-fragments-data", eventHandler);
+        window.removeEventListener("message", messageHandler);
+        clearTimeout(timeoutId);
+        const safeDetail = Array.isArray(detail) ? detail : [];
+        const totalFragments = safeDetail.reduce(
+          (sum, canvasData) => sum + (canvasData.fragments?.length || 0),
+          0,
+        );
+        this.logDebug("canvas-fragments-received", {
+          canvases: safeDetail.length,
+          totalFragments,
+        });
+        resolve(safeDetail);
       };
-      document.addEventListener("docs-reviewer-fragments-data", handler);
+      const eventHandler = (event) => finish(event.detail);
+      const messageHandler = (event) => {
+        if (event.data?.source !== "docs-reviewer-canvas-patcher") return;
+        if (event.data?.type !== "docs-reviewer-fragments-data") return;
+        finish(event.data.detail);
+      };
+      document.addEventListener("docs-reviewer-fragments-data", eventHandler);
+      window.addEventListener("message", messageHandler);
       document.dispatchEvent(new Event("docs-reviewer-request-fragments"));
-      setTimeout(() => {
-        document.removeEventListener("docs-reviewer-fragments-data", handler);
+      timeoutId = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        document.removeEventListener("docs-reviewer-fragments-data", eventHandler);
+        window.removeEventListener("message", messageHandler);
+        this.logDebug("canvas-fragments-timeout", { timeout });
         resolve([]);
       }, timeout);
     });
@@ -1425,12 +1535,23 @@ export const DocsHighlighter = {
 
   mapIssuesToRectsFromCanvas(sortedFragments, canvasTextModel) {
     const issueRects = new Map();
+    const stats = {
+      issueCount: this.issues.length,
+      matchedByRange: 0,
+      matchedByFallback: 0,
+      visibleIssues: 0,
+      noTextMatch: 0,
+      noRectsAfterMatch: 0,
+      sampleMisses: [],
+    };
 
     for (const issue of this.issues) {
       let startIndex = issue.normalizedStart;
       let endIndex = issue.normalizedEnd;
       const normalizedNeedle = this.normalizeText(issue.textoOriginal);
       let rects = [];
+      let matchedByFallback = false;
+      let hadTextMatch = false;
 
       const needsTextFallback =
         startIndex === null ||
@@ -1446,6 +1567,8 @@ export const DocsHighlighter = {
         );
 
       if (!needsTextFallback) {
+        hadTextMatch = true;
+        stats.matchedByRange += 1;
         rects = this.computeRectsFromCanvasIndices(
           sortedFragments,
           canvasTextModel.charMap,
@@ -1462,6 +1585,9 @@ export const DocsHighlighter = {
         );
 
         if (fallbackMatch) {
+          hadTextMatch = true;
+          matchedByFallback = true;
+          stats.matchedByFallback += 1;
           rects = this.computeRectsFromCanvasIndices(
             sortedFragments,
             canvasTextModel.charMap,
@@ -1473,8 +1599,33 @@ export const DocsHighlighter = {
 
       issue.rects = rects;
       issue.isVisible = rects.length > 0;
+      if (rects.length > 0) {
+        stats.visibleIssues += 1;
+      } else if (!hadTextMatch) {
+        stats.noTextMatch += 1;
+        if (stats.sampleMisses.length < 5) {
+          stats.sampleMisses.push({
+            regla: issue.regla,
+            texto: issue.textoOriginal.slice(0, 80),
+            reason: "no-text-match",
+          });
+        }
+      } else {
+        stats.noRectsAfterMatch += 1;
+        if (stats.sampleMisses.length < 5) {
+          stats.sampleMisses.push({
+            regla: issue.regla,
+            texto: issue.textoOriginal.slice(0, 80),
+            reason: matchedByFallback
+              ? "fallback-match-without-rects"
+              : "range-match-without-rects",
+          });
+        }
+      }
       issueRects.set(issue.id, rects);
     }
+
+    this._lastCanvasMappingStats = stats;
     return issueRects;
   },
 

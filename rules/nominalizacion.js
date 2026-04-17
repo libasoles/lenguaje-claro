@@ -11,37 +11,30 @@ export const nominalizacionRule = {
     {
       original: "poner en consideración",
       sugerencias: ["considerar"],
-      palabrasClaves: "poner en consideración",
     },
     {
       original: "dar comienzo",
       sugerencias: ["comenzar", "empezar"],
-      palabrasClaves: "dar comienzo",
     },
     {
       original: "llegar a la conclusión",
       sugerencias: ["concluir"],
-      palabrasClaves: "llegar a la conclusión",
     },
     {
       original: "poner de manifiesto",
       sugerencias: ["manifestar", "decir", "exponer"],
-      palabrasClaves: "poner de manifiesto",
     },
     {
       original: "mantuvieron una reunión",
       sugerencias: ["se reunieron"],
-      palabrasClaves: "mantuvieron una reunión",
     },
     {
       original: "proceder a la entrega",
       sugerencias: ["entregar"],
-      palabrasClaves: "proceder a la entrega",
     },
     {
       original: "realizar una inspección",
       sugerencias: ["inspeccionar"],
-      palabrasClaves: "realizar una inspección",
     },
   ],
 
@@ -49,7 +42,7 @@ export const nominalizacionRule = {
     const matches = [];
 
     this.diccionario.forEach((item) => {
-      const pattern = buildAccentInsensitivePattern(item.palabrasClaves);
+      const pattern = buildAccentInsensitivePattern(item.original);
       const regex = new RegExp(`\\b${pattern}\\b`, "gi");
       let match;
 

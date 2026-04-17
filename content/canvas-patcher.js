@@ -7,6 +7,7 @@
   'use strict';
 
   const RENDER_BURST_GAP_MS = 40;
+  const PREFIX = '[Legal Docs][CanvasPatcher]';
 
   // Map from canvas element → { fragments, lastWriteAt }
   const canvasStates = new Map();
@@ -55,9 +56,23 @@
 
     renderNotificationTimer = setTimeout(function () {
       renderNotificationTimer = null;
+      let totalFragments = 0;
+      canvasStates.forEach(function (state) {
+        totalFragments += state.fragments.length;
+      });
+      console.log(PREFIX, {
+        stage: 'canvas-rendered',
+        canvases: canvasStates.size,
+        totalFragments,
+        renderedAt: getNow(),
+      });
       document.dispatchEvent(
         new CustomEvent('docs-reviewer-canvas-rendered', {
-          detail: { renderedAt: getNow() },
+          detail: {
+            renderedAt: getNow(),
+            canvases: canvasStates.size,
+            totalFragments,
+          },
         }),
       );
     }, RENDER_BURST_GAP_MS);
@@ -136,6 +151,24 @@
         }),
       });
     });
+    const totalFragments = result.reduce(function (sum, canvasData) {
+      return sum + canvasData.fragments.length;
+    }, 0);
+    console.log(PREFIX, {
+      stage: 'fragments-requested',
+      canvases: result.length,
+      totalFragments,
+    });
+    if (typeof window !== 'undefined' && typeof window.postMessage === 'function') {
+      window.postMessage(
+        {
+          source: 'docs-reviewer-canvas-patcher',
+          type: 'docs-reviewer-fragments-data',
+          detail: result,
+        },
+        '*',
+      );
+    }
     document.dispatchEvent(new CustomEvent('docs-reviewer-fragments-data', { detail: result }));
   });
 })();

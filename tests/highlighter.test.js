@@ -17,6 +17,18 @@ function loadHighlighter() {
       };
     },
   };
+  const windowListeners = new Map();
+  const window = {
+    addEventListener(type, handler) {
+      if (!windowListeners.has(type)) {
+        windowListeners.set(type, new Set());
+      }
+      windowListeners.get(type).add(handler);
+    },
+    removeEventListener(type, handler) {
+      windowListeners.get(type)?.delete(handler);
+    },
+  };
   const sandbox = {
     console,
     Map,
@@ -34,7 +46,7 @@ function loadHighlighter() {
         };
       },
     },
-    window: {},
+    window,
   };
 
   const { exports } = loadBrowserModule({

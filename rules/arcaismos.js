@@ -8,69 +8,57 @@ export const arcaismosRule = {
 
   // Diccionario de arcaísmos
   diccionario: [
-    { original: "in fine", sugerencia: "al final", palabrasClaves: "in fine" },
+    { original: "in fine", sugerencia: "al final" },
     {
       original: "a sensu contrario",
       sugerencia: "en sentido contrario",
-      palabrasClaves: "a sensu contrario",
     },
     {
       original: "viene en decidir",
       sugerencia: "se decide",
-      palabrasClaves: "viene en decidir",
     },
     {
       original: "otrosí digo",
       sugerencia: "además solicito",
-      palabrasClaves: "otrosí digo",
     },
     {
       original: "susodicho",
       sugerencia: "mencionado",
-      palabrasClaves: "susodicho",
     },
     {
       original: "infraescrito",
       sugerencia: "quien firma",
-      palabrasClaves: "infraescrito",
     },
     {
       original: "fehaciente",
       sugerencia: "comprobable",
-      palabrasClaves: "fehaciente",
     },
-    { original: "incoar", sugerencia: "iniciar", palabrasClaves: "incoar" },
-    { original: "adverar", sugerencia: "acreditar", palabrasClaves: "adverar" },
-    { original: "dirimir", sugerencia: "resolver", palabrasClaves: "dirimir" },
+    { original: "incoar", sugerencia: "iniciar" },
+    { original: "adverar", sugerencia: "acreditar" },
+    { original: "dirimir", sugerencia: "resolver" },
     {
       original: "decaer en su derecho",
       sugerencia: "perder su derecho",
-      palabrasClaves: "decaer en su derecho",
     },
     {
       original: "sírvase proveer",
       sugerencia: "disponga",
-      palabrasClaves: "sírvase proveer",
     },
     {
       original: "tenor literal",
       sugerencia: "texto literal",
-      palabrasClaves: "tenor literal",
     },
     {
       original: "tengo el agrado de dirigirme",
       sugerencias: ["le escribo para"],
-      palabrasClaves: "tengo el agrado de dirigirme",
     },
     {
       original: "obra en mi poder",
       sugerencias: ["tengo"],
-      palabrasClaves: "obra en mi poder",
     },
     {
       original: "elevar una consulta",
       sugerencias: ["consultar", "preguntar"],
-      palabrasClaves: "elevar una consulta",
     },
   ],
 
@@ -79,7 +67,7 @@ export const arcaismosRule = {
 
     this.diccionario.forEach((item) => {
       // Case-insensitive regex con word boundaries
-      const pattern = buildAccentInsensitivePattern(item.palabrasClaves);
+      const pattern = buildAccentInsensitivePattern(item.original);
       const regex = new RegExp(`\\b${pattern}\\b`, "gi");
       let match;
 

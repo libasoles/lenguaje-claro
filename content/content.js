@@ -20,6 +20,8 @@ export const DocsReviewer = {
   isUndoInFlight: false,
   isAnalyzing: false,
   _pendingReanalysis: false,
+  _analysisRunId: 0,
+  _lastAnalysisStartedAt: 0,
 
   async init() {
     if (this.isInitialized) return;
@@ -41,6 +43,23 @@ export const DocsReviewer = {
 
     this.isInitialized = true;
     console.log("[Legal Docs] Inicialización completada");
+  },
+
+  getDebugNow() {
+    if (typeof performance !== "undefined" && performance?.now) {
+      return performance.now();
+    }
+    return Date.now();
+  },
+
+  logAnalysisTrace(stage, detail = {}) {
+    const startedAt = this._lastAnalysisStartedAt || this.getDebugNow();
+    console.log("[Legal Docs][Analysis]", {
+      runId: this._analysisRunId,
+      t: Math.round((this.getDebugNow() - startedAt) * 10) / 10,
+      stage,
+      ...detail,
+    });
   },
 
   getRuleMap() {
@@ -112,11 +131,20 @@ export const DocsReviewer = {
   async analizarDocumento(options = {}) {
     if (this.isAnalyzing) {
       this._pendingReanalysis = true;
+      this.logAnalysisTrace("queued-reanalysis", {
+        interactive: Boolean(options.interactive),
+      });
       return;
     }
 
     this.isAnalyzing = true;
     this._pendingReanalysis = false;
+    this._analysisRunId += 1;
+    this._lastAnalysisStartedAt = this.getDebugNow();
+    this.logAnalysisTrace("start", {
+      interactive: Boolean(options.interactive),
+      existingIssues: this.allMatches.length,
+    });
 
     try {
       if (this.allMatches.length === 0) {
@@ -127,6 +155,13 @@ export const DocsReviewer = {
 
       const documento = await DocsReader.leerDocumento(options);
       const textoCompleto = documento?.text;
+      this.logAnalysisTrace("doc-read-finished", {
+        hasText: Boolean(textoCompleto),
+        textLength: textoCompleto?.length || 0,
+        segments: Array.isArray(documento?.segments)
+          ? documento.segments.length
+          : 0,
+      });
 
       if (!textoCompleto) {
         const readError = DocsReader.lastReadError;
@@ -190,11 +225,24 @@ export const DocsReviewer = {
       console.log(
         `[Legal Docs] Total: ${this.allMatches.length} problemas detectados`,
       );
+      this.logAnalysisTrace("rules-finished", {
+        totalIssues: this.allMatches.length,
+        ruleCount: rules.length,
+      });
 
       DocsPanel.actualizarIssues(this.allMatches);
+      this.logAnalysisTrace("panel-updated", {
+        renderedIssues: this.allMatches.length,
+      });
       await DocsHighlighter.aplicarHighlights(this.allMatches);
+      this.logAnalysisTrace("highlighter-bootstrap-finished", {
+        issueCount: this.allMatches.length,
+      });
     } finally {
       this.isAnalyzing = false;
+      this.logAnalysisTrace("finish", {
+        pendingReanalysis: this._pendingReanalysis,
+      });
       if (this._pendingReanalysis) {
         this._pendingReanalysis = false;
         setTimeout(() => this.analizarDocumento(), 0);
