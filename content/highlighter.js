@@ -2,6 +2,8 @@ import { DocsPanel } from "./panel.js";
 import { getReviewerActions } from "./reviewer-actions.js";
 import { mantenerCase } from "../rules/shared.js";
 
+const TEXT_ROOT_POLL_INTERVAL_MS = 25;
+const REANALYZE_DEBOUNCE_MS = 700;
 export const DocsHighlighter = {
   overlayElement: null,
   popupElement: null,
@@ -85,21 +87,35 @@ export const DocsHighlighter = {
     });
   },
 
-  async aplicarHighlights(allMatches) {
+  async aplicarHighlights(allMatches, options = {}) {
+    const preserveVisibleState = Boolean(options.preserveVisibleState);
+
     this.inicializar();
     this.issues = allMatches || [];
-    this.pinnedIssueId = null;
-    this.hoverIssueId = null;
-    this.activeIssueId = null;
-    this.startDebugSession({ issueCount: this.issues.length });
-    this.renderMarkers(new Map());
 
-    // No bloquear el primer render esperando el text root: en Google Docs
-    // el contenido suele entrar primero por canvas y el fallback ya puede ubicar rects.
-    this.scheduleRecalculate("initial-bootstrap");
+    if (!preserveVisibleState) {
+      this.pinnedIssueId = null;
+      this.hoverIssueId = null;
+      this.activeIssueId = null;
+    }
+    this.startDebugSession({ issueCount: this.issues.length });
+    if (!preserveVisibleState) {
+      this.renderMarkers(new Map());
+    }
+
+    // Esperar a que el textRoot esté disponible
+    const textRoot = await this.waitForTextRoot();
+    if (!textRoot) {
+      console.log(
+        "[Legal Docs] aplicarHighlights: Could not find text root, will retry on mutation",
+      );
+    }
+
+    this.scheduleRecalculate(
+      textRoot ? "initial-bootstrap" : "initial-bootstrap-timeout",
+    );
     this.observeTextRoot();
     this.scheduleBootstrapRetry();
-    void this.ensureTextRootObservation();
   },
 
   getDebugNow() {
@@ -129,7 +145,9 @@ export const DocsHighlighter = {
     });
   },
 
-  limpiar() {
+  limpiar(options = {}) {
+    const preserveCanvasCache = Boolean(options.preserveCanvasCache);
+    const preserveMarkers = Boolean(options.preserveMarkers);
     this.cancelHidePopup();
     if (this.recalcFrame) {
       cancelAnimationFrame(this.recalcFrame);
@@ -145,14 +163,18 @@ export const DocsHighlighter = {
       this.mutationObserver = null;
     }
 
-    this.currentRects = new Map();
-    this._lastRenderedCanvasData = null;
-    this._lastRenderedCanvasAt = 0;
-    this.issueMarkers.forEach((markers) => {
-      markers.forEach((marker) => marker.remove());
-    });
-    this.issueMarkers.clear();
-    this.hidePopup();
+    if (!preserveCanvasCache) {
+      this._lastRenderedCanvasData = null;
+      this._lastRenderedCanvasAt = 0;
+    }
+    if (!preserveMarkers) {
+      this.currentRects = new Map();
+      this.issueMarkers.forEach((markers) => {
+        markers.forEach((marker) => marker.remove());
+      });
+      this.issueMarkers.clear();
+      this.hidePopup();
+    }
     this.logDebug("session-cleared");
   },
 
@@ -292,23 +314,6 @@ export const DocsHighlighter = {
     });
   },
 
-  ensureTextRootObservation(timeout = 5000) {
-    return this.waitForTextRoot(timeout).then((textRoot) => {
-      if (!textRoot) {
-        this.logDebug("text-root-bootstrap-timeout", { timeout });
-        return null;
-      }
-
-      if (!this.issues?.length) {
-        return textRoot;
-      }
-
-      this.observeTextRoot();
-      this.scheduleRecalculate("text-root-ready");
-      return textRoot;
-    });
-  },
-
   clearBootstrapRetry() {
     if (!Array.isArray(this.bootstrapRetryTimers)) {
       this.bootstrapRetryTimers = [];
@@ -321,23 +326,14 @@ export const DocsHighlighter = {
     this.bootstrapRetryTimers = [];
   },
 
-  scheduleBootstrapRetry({ delaysMs = [120, 300, 700, 1400, 2600, 4200] } = {}) {
+  scheduleBootstrapRetry({ delaysMs = [40, 120, 260, 520, 900, 1400] } = {}) {
     this.clearBootstrapRetry();
     if (!Array.isArray(this.issues) || this.issues.length === 0) return;
 
-    const recalcGeneration = this._recalcGeneration;
-    this.logDebug("bootstrap-retries-armed", {
-      delaysMs,
-      recalcGeneration,
-    });
     this.bootstrapRetryTimers = delaysMs.map((delayMs) =>
       setTimeout(() => {
         if (!this.issues?.length) return;
-        if (this._recalcGeneration < recalcGeneration) return;
-        this.logDebug("bootstrap-retry-fired", {
-          delayMs,
-          recalcGeneration,
-        });
+        this.logDebug("bootstrap-retry-fired", { delayMs });
         this.scheduleRecalculate(`bootstrap-${delayMs}`);
       }, delayMs),
     );
@@ -348,8 +344,8 @@ export const DocsHighlighter = {
     this.reanalysisTimer = setTimeout(() => {
       this.reanalysisTimer = null;
       console.log("[Legal Docs] Re-analizando documento tras edición...");
-      getReviewerActions().analizarDocumento();
-    }, 2000);
+      getReviewerActions().analizarDocumento({ preservePanel: true });
+    }, REANALYZE_DEBOUNCE_MS);
   },
 
   setIssueActivo(issueId, options = {}) {
@@ -404,20 +400,22 @@ export const DocsHighlighter = {
       const check = () => {
         const root = this.getTextRootSync();
         if (root) {
-          this.logDebug("text-root-wait-found", {
-            waitedMs: Date.now() - startTime,
-          });
+          console.log(
+            `[Legal Docs] waitForTextRoot: Found after ${Date.now() - startTime}ms`,
+          );
           resolve(root);
           return;
         }
 
         if (Date.now() - startTime > timeout) {
-          this.logDebug("text-root-wait-timeout", { timeout });
+          console.log(
+            `[Legal Docs] waitForTextRoot: Timeout after ${timeout}ms`,
+          );
           resolve(null);
           return;
         }
 
-        setTimeout(check, 100);
+        setTimeout(check, TEXT_ROOT_POLL_INTERVAL_MS);
       };
 
       check();
@@ -442,62 +440,38 @@ export const DocsHighlighter = {
       '[role="main"] [role="textbox"]',
       '[role="document"]',
       '[role="textbox"]',
+      ".kix-appview-editor",
+      ".kix-appview",
     ];
-
-    let bestCandidate = null;
 
     for (const selector of candidates) {
       const elements = Array.from(document.querySelectorAll(selector));
       for (const element of elements) {
-        const visibleTextLength = this.getVisibleTextLength(element);
-        if (!visibleTextLength) continue;
-
-        if (
-          !bestCandidate ||
-          visibleTextLength > bestCandidate.visibleTextLength
-        ) {
-          bestCandidate = {
-            element,
-            selector,
-            visibleTextLength,
-          };
+        if (this.hasVisibleText(element)) {
+          console.log(
+            `[Legal Docs] Found text root with selector: ${selector}`,
+          );
+          return element;
         }
       }
     }
 
-    if (bestCandidate) {
-      this.logDebug("text-root-found", {
-        selector: bestCandidate.selector,
-        visibleTextLength: bestCandidate.visibleTextLength,
-      });
-      return bestCandidate.element;
-    }
-
-    const now = this.getDebugNow();
-    if (now - this._debugLastMissingTextRootAt > 500) {
-      this._debugLastMissingTextRootAt = now;
-      this.logDebug("text-root-missing");
-    }
+    console.log("[Legal Docs] No suitable text root found");
     return null;
   },
 
   hasVisibleText(root) {
-    return this.getVisibleTextLength(root) > 0;
-  },
-
-  getVisibleTextLength(root, maxChars = 4000) {
-    if (!root) return 0;
+    if (!root) return false;
 
     const style = window.getComputedStyle(root);
     if (style.display === "none" || style.visibility === "hidden") {
-      return 0;
+      return false;
     }
 
     if (root.getAttribute?.("aria-hidden") === "true") {
-      return 0;
+      return false;
     }
 
-    let visibleChars = 0;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         if (!node.textContent?.trim()) {
@@ -520,15 +494,7 @@ export const DocsHighlighter = {
       },
     });
 
-    let currentNode;
-    while ((currentNode = walker.nextNode())) {
-      visibleChars += currentNode.textContent.trim().length;
-      if (visibleChars >= maxChars) {
-        return maxChars;
-      }
-    }
-
-    return visibleChars;
+    return Boolean(walker.nextNode());
   },
 
   observeTextRoot() {
@@ -539,17 +505,10 @@ export const DocsHighlighter = {
 
     const textRoot = this.getTextRoot();
     if (!textRoot) return;
-    this.logDebug("text-root-observer-attached", {
-      root:
-        textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
-    });
 
     this.mutationObserver = new MutationObserver((mutations) => {
       // Always reposition overlays — layout may have shifted.
-      this.logDebug("text-root-mutation", {
-        mutations: mutations.length,
-      });
-      this.scheduleRecalculate("text-root-mutation");
+      this.scheduleRecalculate();
 
       // Fire re-analysis only for actual text content changes.
       const hasTextChange = mutations.some((mutation) => {
@@ -708,6 +667,7 @@ export const DocsHighlighter = {
       let startIndex = issue.normalizedStart;
       let endIndex = issue.normalizedEnd;
       const normalizedNeedle = this.normalizeText(issue.textoOriginal);
+      const exactNeedle = this.normalizeExactText(issue.textoOriginal);
 
       // Determine whether we need to run the text-based indexOf fallback.
       // Three cases require it:
@@ -716,6 +676,9 @@ export const DocsHighlighter = {
       //      footnotes/headers/metadata) is longer than visible DOM text, so positions
       //      from later in the document overshoot. Fall back to indexOf instead of
       //      silently dropping the highlight.
+      //   3. The lowercased text still matches but casing does not: this can happen
+      //      when repeated words differ only by case and the visual mapping crossed
+      //      two instances.
       const needsTextFallback =
         startIndex === null ||
         startIndex === undefined ||
@@ -727,6 +690,12 @@ export const DocsHighlighter = {
           startIndex,
           endIndex,
           normalizedNeedle,
+        ) ||
+        !this.rangeMatchesExactText(
+          textModel.normalizedText,
+          startIndex,
+          endIndex,
+          exactNeedle,
         );
 
       if (needsTextFallback) {
@@ -737,9 +706,9 @@ export const DocsHighlighter = {
           return;
         }
 
-        const fallbackRange = this.findBestNeedleRange(
-          textModel.normalizedLower,
-          normalizedNeedle,
+        const fallbackRange = this.findBestTextRange(
+          textModel,
+          issue,
           startIndex,
         );
         if (!fallbackRange) {
@@ -748,6 +717,13 @@ export const DocsHighlighter = {
           issueRects.set(issue.id, []);
           return;
         }
+        this.logIssueRangeFallback(
+          "dom",
+          issue,
+          startIndex,
+          endIndex,
+          fallbackRange,
+        );
         startIndex = fallbackRange.start;
         endIndex = fallbackRange.end;
       }
@@ -771,9 +747,9 @@ export const DocsHighlighter = {
 
       // If the range mapped by offsets produced no visible rects, retry by text.
       if (!rects.length && normalizedNeedle) {
-        const fallbackMatch = this.findBestNeedleRange(
-          textModel.normalizedLower,
-          normalizedNeedle,
+        const fallbackMatch = this.findBestTextRange(
+          textModel,
+          issue,
           startIndex,
         );
 
@@ -800,8 +776,12 @@ export const DocsHighlighter = {
     return issueRects;
   },
 
+  normalizeExactText(text) {
+    return (text || "").replace(/\s+/g, " ").trim();
+  },
+
   normalizeText(text) {
-    return (text || "").replace(/\s+/g, " ").trim().toLocaleLowerCase();
+    return this.normalizeExactText(text).toLocaleLowerCase();
   },
 
   rangeMatchesNeedle(normalizedText, startIndex, endIndex, needle) {
@@ -819,46 +799,126 @@ export const DocsHighlighter = {
     return normalizedText.slice(startIndex, endIndex) === needle;
   },
 
-  findBestNeedleMatch(haystack, needle, preferredStart) {
-    if (!needle || !haystack) return -1;
+  rangeMatchesExactText(normalizedText, startIndex, endIndex, needle) {
+    if (
+      !needle ||
+      !normalizedText ||
+      !Number.isInteger(startIndex) ||
+      !Number.isInteger(endIndex) ||
+      startIndex < 0 ||
+      endIndex <= startIndex
+    ) {
+      return false;
+    }
 
-    let bestIndex = -1;
-    let bestDistance = Number.POSITIVE_INFINITY;
+    return normalizedText.slice(startIndex, endIndex) === needle;
+  },
+
+  findNeedleRanges(haystack, needle) {
+    if (!needle || !haystack) return [];
+
+    const matches = [];
     let next = haystack.indexOf(needle);
 
     while (next !== -1) {
-      const distance =
-        Number.isInteger(preferredStart) && preferredStart >= 0
-          ? Math.abs(next - preferredStart)
-          : next;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = next;
-      }
+      matches.push({
+        start: next,
+        end: next + needle.length,
+      });
       next = haystack.indexOf(needle, next + 1);
     }
 
-    return bestIndex;
+    return matches;
   },
 
-  findBestNeedleRange(haystack, needle, preferredStart) {
-    const exactStart = this.findBestNeedleMatch(
-      haystack,
-      needle,
+  selectNeedleRange(candidates, preferredStart, ordinal = null) {
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return null;
+    }
+
+    if (
+      Number.isInteger(ordinal) &&
+      ordinal >= 0 &&
+      ordinal < candidates.length
+    ) {
+      return candidates[ordinal];
+    }
+
+    if (!Number.isInteger(preferredStart) || preferredStart < 0) {
+      return candidates[0];
+    }
+
+    let bestCandidate = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    candidates.forEach((candidate) => {
+      const distance = Math.abs(candidate.start - preferredStart);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestCandidate = candidate;
+      }
+    });
+
+    return bestCandidate;
+  },
+
+  getIssueNeedleOrdinal(issue, { caseSensitive = false } = {}) {
+    if (!issue?.id) return 0;
+
+    const targetNeedle = caseSensitive
+      ? this.normalizeExactText(issue.textoOriginal)
+      : this.normalizeText(issue.textoOriginal);
+    let ordinal = 0;
+
+    for (const candidate of this.issues || []) {
+      if (candidate.id === issue.id) {
+        break;
+      }
+
+      const candidateNeedle = caseSensitive
+        ? this.normalizeExactText(candidate.textoOriginal)
+        : this.normalizeText(candidate.textoOriginal);
+      if (candidateNeedle === targetNeedle) {
+        ordinal += 1;
+      }
+    }
+
+    return ordinal;
+  },
+
+  findBestNeedleRange(haystack, needle, preferredStart, options = {}) {
+    const exactCandidates = this.findNeedleRanges(haystack, needle);
+    const exactMatch = this.selectNeedleRange(
+      exactCandidates,
       preferredStart,
+      options.ordinal,
     );
 
-    if (exactStart !== -1) {
+    if (exactMatch) {
       return {
-        start: exactStart,
-        end: exactStart + needle.length,
+        ...exactMatch,
+        matchType: options.matchType || "exact",
+        candidateCount: exactCandidates.length,
       };
     }
 
-    return this.findFlexibleNeedleRange(haystack, needle, preferredStart);
+    const flexibleMatch = this.findFlexibleNeedleRange(
+      haystack,
+      needle,
+      preferredStart,
+      options,
+    );
+    if (!flexibleMatch) {
+      return null;
+    }
+
+    return {
+      ...flexibleMatch,
+      matchType: options.flexibleMatchType || "flexible",
+    };
   },
 
-  findFlexibleNeedleRange(haystack, needle, preferredStart) {
+  findFlexibleNeedleRange(haystack, needle, preferredStart, options = {}) {
     if (!needle || !haystack) return null;
 
     const tokens = needle.split(/\s+/).filter(Boolean);
@@ -870,31 +930,81 @@ export const DocsHighlighter = {
     const separatorPattern = "[\\s.,;:!?\"'()\\[\\]{}-]*";
     const regex = new RegExp(escapedTokens.join(separatorPattern), "g");
 
-    let bestMatch = null;
+    const candidates = [];
     let match;
 
     while ((match = regex.exec(haystack)) !== null) {
-      const candidate = {
+      candidates.push({
         start: match.index,
         end: match.index + match[0].length,
-      };
-
-      if (
-        !bestMatch ||
-        !Number.isInteger(preferredStart) ||
-        preferredStart < 0 ||
-        Math.abs(candidate.start - preferredStart) <
-          Math.abs(bestMatch.start - preferredStart)
-      ) {
-        bestMatch = candidate;
-      }
+      });
 
       if (match[0].length === 0) {
         regex.lastIndex += 1;
       }
     }
 
-    return bestMatch;
+    return this.selectNeedleRange(candidates, preferredStart, options.ordinal);
+  },
+
+  findBestTextRange(textModel, issue, preferredStart) {
+    if (!textModel || !issue?.textoOriginal) {
+      return null;
+    }
+
+    const exactNeedle = this.normalizeExactText(issue.textoOriginal);
+    const normalizedNeedle = this.normalizeText(issue.textoOriginal);
+    const exactMatch = this.findBestNeedleRange(
+      textModel.normalizedText,
+      exactNeedle,
+      preferredStart,
+      {
+        ordinal: this.getIssueNeedleOrdinal(issue, { caseSensitive: true }),
+        matchType: "exact-case-sensitive",
+        flexibleMatchType: "flexible-case-sensitive",
+      },
+    );
+
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    return this.findBestNeedleRange(
+      textModel.normalizedLower,
+      normalizedNeedle,
+      preferredStart,
+      {
+        ordinal: this.getIssueNeedleOrdinal(issue, { caseSensitive: false }),
+        matchType: "exact-case-insensitive",
+        flexibleMatchType: "flexible-case-insensitive",
+      },
+    );
+  },
+
+  logIssueRangeFallback(
+    source,
+    issue,
+    expectedStart,
+    expectedEnd,
+    resolvedRange,
+  ) {
+    this.logDebug("issue-range-fallback", {
+      source,
+      issueId: issue?.id,
+      regla: issue?.regla,
+      texto: issue?.textoOriginal,
+      expectedRange: {
+        start: expectedStart,
+        end: expectedEnd,
+      },
+      chosenRange: resolvedRange
+        ? {
+            start: resolvedRange.start,
+            end: resolvedRange.end,
+          }
+        : null,
+      matchType: resolvedRange?.matchType || "none",
+    });
   },
 
   createRangeFromIndices(charMap, startIndex, endIndex) {
@@ -985,7 +1095,8 @@ export const DocsHighlighter = {
       issueCount: this.issues.length,
       markerGroups:
         issueRects instanceof Map
-          ? Array.from(issueRects.values()).filter((rects) => rects?.length).length
+          ? Array.from(issueRects.values()).filter((rects) => rects?.length)
+              .length
           : 0,
     });
 
@@ -1016,8 +1127,7 @@ export const DocsHighlighter = {
         marker.style.visibility = "visible";
         marker.style.opacity = "1";
         marker.style.boxSizing = "border-box";
-        marker.style.backgroundImage =
-          `linear-gradient(90deg, ${issue.color} 0 42%, transparent 42% 58%, ${issue.color} 58% 100%)`;
+        marker.style.backgroundImage = `linear-gradient(90deg, ${issue.color} 0 42%, transparent 42% 58%, ${issue.color} 58% 100%)`;
         marker.style.backgroundSize = "10px 4px";
         marker.style.backgroundRepeat = "repeat-x";
         marker.style.backgroundPosition = "left calc(100% - 2px)";
@@ -1167,9 +1277,9 @@ export const DocsHighlighter = {
     const safeOriginal = this.escapeHTML(issue.textoOriginal);
     const suggestionHTML =
       isHintOnly && issue.sugerencia
-        ? `<div class="docs-reviewer-popup-hint"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
+        ? `<div class="docs-reviewer-popup-hint">${this.escapeHTML(issue.sugerencia)}</div>`
         : canApply && !hasMultipleSugerencias
-          ? `<div class="docs-reviewer-popup-suggestion"><strong>Sugerencia:</strong> ${this.escapeHTML(issue.sugerencia)}</div>`
+          ? `<div class="docs-reviewer-popup-suggestion">${this.escapeHTML(issue.sugerencia)}</div>`
           : "";
     const logoUrl = chrome.runtime.getURL("assets/icons/logo.png");
 
@@ -1201,7 +1311,7 @@ export const DocsHighlighter = {
       ${actionsHTML}
       <div class="docs-reviewer-popup-footer">
         <img src="${logoUrl}" class="docs-reviewer-popup-logo" alt="">
-        <button type="button" class="docs-reviewer-popup-footer-link" data-action="panel">Ver más</button>
+        <button type="button" class="docs-reviewer-popup-footer-link" data-action="panel">Abrir panel</button>
       </div>
     `;
   },
@@ -1335,7 +1445,10 @@ export const DocsHighlighter = {
       const finish = (detail) => {
         if (settled) return;
         settled = true;
-        document.removeEventListener("docs-reviewer-fragments-data", eventHandler);
+        document.removeEventListener(
+          "docs-reviewer-fragments-data",
+          eventHandler,
+        );
         window.removeEventListener("message", messageHandler);
         clearTimeout(timeoutId);
         const safeDetail = Array.isArray(detail) ? detail : [];
@@ -1360,7 +1473,10 @@ export const DocsHighlighter = {
       timeoutId = setTimeout(() => {
         if (settled) return;
         settled = true;
-        document.removeEventListener("docs-reviewer-fragments-data", eventHandler);
+        document.removeEventListener(
+          "docs-reviewer-fragments-data",
+          eventHandler,
+        );
         window.removeEventListener("message", messageHandler);
         this.logDebug("canvas-fragments-timeout", { timeout });
         resolve([]);
@@ -1614,6 +1730,7 @@ export const DocsHighlighter = {
       let startIndex = issue.normalizedStart;
       let endIndex = issue.normalizedEnd;
       const normalizedNeedle = this.normalizeText(issue.textoOriginal);
+      const exactNeedle = this.normalizeExactText(issue.textoOriginal);
       let rects = [];
       let matchedByFallback = false;
       let hadTextMatch = false;
@@ -1629,6 +1746,12 @@ export const DocsHighlighter = {
           startIndex,
           endIndex,
           normalizedNeedle,
+        ) ||
+        !this.rangeMatchesExactText(
+          canvasTextModel.normalizedText,
+          startIndex,
+          endIndex,
+          exactNeedle,
         );
 
       if (!needsTextFallback) {
@@ -1643,9 +1766,9 @@ export const DocsHighlighter = {
       }
 
       if (!rects.length && normalizedNeedle) {
-        const fallbackMatch = this.findBestNeedleRange(
-          canvasTextModel.normalizedLower,
-          normalizedNeedle,
+        const fallbackMatch = this.findBestTextRange(
+          canvasTextModel,
+          issue,
           startIndex,
         );
 
@@ -1653,6 +1776,13 @@ export const DocsHighlighter = {
           hadTextMatch = true;
           matchedByFallback = true;
           stats.matchedByFallback += 1;
+          this.logIssueRangeFallback(
+            "canvas",
+            issue,
+            startIndex,
+            endIndex,
+            fallbackMatch,
+          );
           rects = this.computeRectsFromCanvasIndices(
             sortedFragments,
             canvasTextModel.charMap,

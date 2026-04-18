@@ -13,6 +13,12 @@
   const canvasStates = new Map();
   let renderNotificationTimer = null;
 
+  // Snapshot of the last completed render burst with viewport-resolved positions.
+  // Populated before dispatching 'canvas-rendered' so it's available even when the
+  // content script (ISOLATED, document_idle) hasn't loaded yet or canvas tiles have
+  // since been removed from the DOM by GDocs' tile virtualization.
+  let lastRenderedSnapshot = null;
+
   function getNow() {
     if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
       return performance.now();
@@ -49,6 +55,36 @@
     };
   }
 
+  function buildCanvasResult(canvas, state) {
+    if (!state.fragments.length || !canvas.isConnected) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      canvasRect: {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      },
+      canvasSize: {
+        width: canvas.width,
+        height: canvas.height,
+      },
+      fragments: state.fragments.map(function (f) {
+        return {
+          text: f.text,
+          x: f.x,
+          y: f.y,
+          font: f.font,
+          textAlign: f.textAlign,
+          textBaseline: f.textBaseline,
+          direction: f.direction,
+          matrix: f.matrix,
+        };
+      }),
+    };
+  }
+
   function scheduleRenderNotification() {
     if (renderNotificationTimer) {
       clearTimeout(renderNotificationTimer);
@@ -56,6 +92,22 @@
 
     renderNotificationTimer = setTimeout(function () {
       renderNotificationTimer = null;
+
+      // Capture viewport-resolved snapshot NOW while canvas tiles are still connected.
+      // This snapshot survives tile disconnection and is served as fallback when the
+      // content script requests fragments after tiles have been recycled by GDocs.
+      const snapshotResults = [];
+      canvasStates.forEach(function (state, canvas) {
+        const result = buildCanvasResult(canvas, state);
+        if (result) snapshotResults.push(result);
+      });
+      if (snapshotResults.length > 0) {
+        lastRenderedSnapshot = {
+          canvasResults: snapshotResults,
+          timestamp: getNow(),
+        };
+      }
+
       let totalFragments = 0;
       canvasStates.forEach(function (state) {
         totalFragments += state.fragments.length;
@@ -64,6 +116,7 @@
         stage: 'canvas-rendered',
         canvases: canvasStates.size,
         totalFragments,
+        snapshotCanvases: snapshotResults.length,
         renderedAt: getNow(),
       });
       document.dispatchEvent(
@@ -122,35 +175,21 @@
   document.addEventListener('docs-reviewer-request-fragments', function () {
     const result = [];
     canvasStates.forEach(function (state, canvas) {
-      const frags = state.fragments;
-      if (!frags.length || !canvas.isConnected) return;
-      const rect = canvas.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      result.push({
-        canvasRect: {
-          left: rect.left,
-          top: rect.top,
-          width: rect.width,
-          height: rect.height,
-        },
-        canvasSize: {
-          width: canvas.width,
-          height: canvas.height,
-        },
-        fragments: frags.map(function (f) {
-          return {
-            text: f.text,
-            x: f.x,
-            y: f.y,
-            font: f.font,
-            textAlign: f.textAlign,
-            textBaseline: f.textBaseline,
-            direction: f.direction,
-            matrix: f.matrix,
-          };
-        }),
-      });
+      const r = buildCanvasResult(canvas, state);
+      if (r) result.push(r);
     });
+
+    // If no connected canvas tiles have data (GDocs may have recycled them),
+    // fall back to the last rendered snapshot captured when tiles were still connected.
+    if (result.length === 0 && lastRenderedSnapshot) {
+      result.push.apply(result, lastRenderedSnapshot.canvasResults);
+      console.log(PREFIX, {
+        stage: 'snapshot-fallback',
+        canvases: result.length,
+        snapshotAge: getNow() - lastRenderedSnapshot.timestamp,
+      });
+    }
+
     const totalFragments = result.reduce(function (sum, canvasData) {
       return sum + canvasData.fragments.length;
     }, 0);

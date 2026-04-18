@@ -145,10 +145,16 @@ export const DocsReviewer = {
     });
 
     try {
-      if (this.allMatches.length === 0) {
+      const isInitialAnalysis = this.allMatches.length === 0;
+      const preserveVisibleState = Boolean(options.preservePanel) && this.isInitialized;
+
+      if (isInitialAnalysis && !preserveVisibleState) {
         DocsPanel.mostrarCargando();
       }
-      DocsHighlighter.limpiar();
+      DocsHighlighter.limpiar({
+        preserveCanvasCache: isInitialAnalysis || preserveVisibleState,
+        preserveMarkers: preserveVisibleState,
+      });
       console.log("[Legal Docs] Obteniendo texto del documento...");
 
       const documento = await DocsReader.leerDocumento(options);
@@ -232,7 +238,9 @@ export const DocsReviewer = {
       this.logAnalysisTrace("panel-updated", {
         renderedIssues: this.allMatches.length,
       });
-      await DocsHighlighter.aplicarHighlights(this.allMatches);
+      await DocsHighlighter.aplicarHighlights(this.allMatches, {
+        preserveVisibleState,
+      });
       this.logAnalysisTrace("highlighter-bootstrap-finished", {
         issueCount: this.allMatches.length,
       });

@@ -180,8 +180,16 @@ export const DocsPanel = {
   _actualizarToolbar() {
     const btnPosicion = document.getElementById("docs-reviewer-sort-posicion");
     const btnRegla = document.getElementById("docs-reviewer-sort-regla");
-    if (btnPosicion) btnPosicion.classList.toggle("docs-reviewer-sort-btn--active", this.sortMode === "posicion");
-    if (btnRegla) btnRegla.classList.toggle("docs-reviewer-sort-btn--active", this.sortMode === "regla");
+    if (btnPosicion)
+      btnPosicion.classList.toggle(
+        "docs-reviewer-sort-btn--active",
+        this.sortMode === "posicion",
+      );
+    if (btnRegla)
+      btnRegla.classList.toggle(
+        "docs-reviewer-sort-btn--active",
+        this.sortMode === "regla",
+      );
   },
 
   actualizarIssues(allMatches) {

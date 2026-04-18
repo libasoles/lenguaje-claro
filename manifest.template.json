@@ -28,7 +28,7 @@
   "content_scripts": [
     {
       "matches": ["https://docs.google.com/*"],
-      "js": ["content/kix-bridge.js"],
+      "js": ["content/canvas-patcher.js", "content/kix-bridge.js"],
       "run_at": "document_start",
       "world": "MAIN"
     },

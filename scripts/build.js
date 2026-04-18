@@ -10,6 +10,7 @@ const IS_WATCH = process.argv.includes("--watch");
 
 const ENTRY_POINTS = [
   path.join(ROOT, "background.js"),
+  path.join(ROOT, "content", "canvas-patcher.js"),
   path.join(ROOT, "content", "kix-bridge.js"),
   path.join(ROOT, "content", "index.js"),
 ];

@@ -15,8 +15,6 @@
 // world sobre el `[contenteditable]` dentro de `iframe.docs-texteventtarget-iframe`,
 // que es same-origin y accesible sin necesidad de main world.
 
-import "./canvas-patcher.js";
-
 (function () {
   'use strict';
 
