@@ -267,6 +267,21 @@
   background: #8e44ad;
 }
 
+.docs-reviewer-issue[data-regla="rodeos"]
+  .docs-reviewer-issue-regla::before {
+  background: #16a085;
+}
+
+.docs-reviewer-issue[data-regla="numeros"]
+  .docs-reviewer-issue-regla::before {
+  background: #2980b9;
+}
+
+.docs-reviewer-issue[data-regla="nominalizacion"]
+  .docs-reviewer-issue-regla::before {
+  background: #27ae60;
+}
+
 .docs-reviewer-issue-color {
   color: #666;
   flex: 1;

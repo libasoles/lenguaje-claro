@@ -9,6 +9,8 @@ export const vaguedadesRule = {
 
   // `precision` explica qué tipo de información concreta reemplazaría la vaguedad.
   // No se puede sugerir un texto exacto, por eso `aplicable: false`.
+
+  // TODO: da falsos positivos, como "responsabilidad alguna", "algún modo", "alguna manera", "alguna vez", "pronto llegará el verano",
   diccionario: [
     {
       palabrasClaves: "mucho",
@@ -35,36 +37,41 @@ export const vaguedadesRule = {
       precision: "Cifra o porcentaje de satisfacción (ej: 85%)",
     },
     {
-      palabrasClaves: "algunos",
-      precision: "Cifra o porcentaje de cantidad (ej: cuatro de diez)",
-    },
-    {
-      palabrasClaves: "algunas",
-      precision: "Cifra o porcentaje de cantidad (ej: cuatro de diez)",
-    },
-    {
-      palabrasClaves: "algún",
-      precision: "Cifra o porcentaje de cantidad (ej: cuatro de diez)",
-    },
-    {
-      palabrasClaves: "alguna",
-      precision: "Cifra o porcentaje de cantidad (ej: cuatro de diez)",
-    },
-    {
-      palabrasClaves: "pronto",
-      precision: "Periodo de tiempo (ej: en dos días; el 18 de julio)",
-    },
-    {
       palabrasClaves: "en alguna medida",
       precision: "Cifra de proporción numérica (ej: uno de cada tres)",
     },
     {
-      palabrasClaves: "apropiado",
+      palabrasClaves: "razonable",
       precision:
         "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
     },
     {
-      palabrasClaves: "apropiada",
+      palabrasClaves: "suficiente",
+      precision:
+        "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
+    },
+    {
+      palabrasClaves: "suficientes",
+      precision:
+        "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
+    },
+    {
+      palabrasClaves: "considerable",
+      precision:
+        "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
+    },
+    {
+      palabrasClaves: "considerables",
+      precision:
+        "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
+    },
+    {
+      palabrasClaves: "oportuno",
+      precision:
+        "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
+    },
+    {
+      palabrasClaves: "oportuna",
       precision:
         "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)",
     },
@@ -75,7 +82,10 @@ export const vaguedadesRule = {
 
     this.diccionario.forEach((item) => {
       const pattern = buildAccentInsensitivePattern(item.palabrasClaves);
-      const regex = new RegExp(`\\b${pattern}\\b`, "gi");
+      const regex =
+        item.palabrasClaves === "muchas"
+          ? new RegExp(`\\b${pattern}\\b(?!\\s+gracias\\b)`, "gi")
+          : new RegExp(`\\b${pattern}\\b`, "gi");
       let match;
 
       while ((match = regex.exec(texto)) !== null) {

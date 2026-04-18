@@ -8,45 +8,45 @@ export const arcaismosRule = {
 
   // Diccionario de arcaísmos
   diccionario: [
-    { original: "in fine", sugerencia: "al final" },
+    { original: "in fine", sugerencias: ["al final"] },
     {
       original: "a sensu contrario",
-      sugerencia: "en sentido contrario",
+      sugerencias: ["en sentido contrario"],
     },
     {
       original: "viene en decidir",
-      sugerencia: "se decide",
+      sugerencias: ["se decide"],
     },
     {
       original: "otrosí digo",
-      sugerencia: "además solicito",
+      sugerencias: ["además solicito"],
     },
     {
       original: "susodicho",
-      sugerencia: "mencionado",
+      sugerencias: ["mencionado"],
     },
     {
       original: "infraescrito",
-      sugerencia: "quien firma",
+      sugerencias: ["quien firma"],
     },
     {
       original: "fehaciente",
-      sugerencia: "comprobable",
+      sugerencias: ["comprobable"],
     },
-    { original: "incoar", sugerencia: "iniciar" },
-    { original: "adverar", sugerencia: "acreditar" },
-    { original: "dirimir", sugerencia: "resolver" },
+    { original: "incoar", sugerencias: ["iniciar"] },
+    { original: "adverar", sugerencias: ["acreditar"] },
+    { original: "dirimir", sugerencias: ["resolver"] },
     {
       original: "decaer en su derecho",
-      sugerencia: "perder su derecho",
+      sugerencias: ["perder su derecho"],
     },
     {
       original: "sírvase proveer",
-      sugerencia: "disponga",
+      sugerencias: ["disponga"],
     },
     {
       original: "tenor literal",
-      sugerencia: "texto literal",
+      sugerencias: ["texto literal"],
     },
     {
       original: "tengo el agrado de dirigirme",
@@ -72,13 +72,15 @@ export const arcaismosRule = {
       let match;
 
       while ((match = regex.exec(texto)) !== null) {
-        const sugerencia = mantenerCase(match[0], item.sugerencia);
+        const sugerencias = item.sugerencias.map((s) => mantenerCase(match[0], s));
+        const sugerencia = sugerencias[0];
         matches.push({
           id: `${this.id}-${matches.length}`,
           inicio: match.index,
           fin: match.index + match[0].length,
           textoOriginal: match[0],
           sugerencia,
+          sugerencias,
           regla: this.id,
           descripcion: `Reemplazar "${match[0]}" por "${sugerencia}"`,
         });

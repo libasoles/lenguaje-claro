@@ -24,6 +24,8 @@ export const DocsHighlighter = {
   _debugStartedAt: 0,
   _debugRecalcCount: 0,
   _debugLastMissingTextRootAt: 0,
+  _lastRenderedCanvasData: null,
+  _lastRenderedCanvasAt: 0,
 
   inicializar() {
     if (this.overlayElement && this.popupElement) return;
@@ -57,6 +59,17 @@ export const DocsHighlighter = {
       true,
     );
     document.addEventListener("docs-reviewer-canvas-rendered", (event) => {
+      // Cachear fragmentos ANTES de verificar issues: GDocs suele renderizar antes
+      // de que retorne la API OAuth. El caché permite usar esos fragmentos más tarde
+      // aunque los canvas tiles se hayan desconectado para ese momento.
+      void this.requestCanvasFragments().then((fragments) => {
+        if (fragments.length > 0) {
+          this._lastRenderedCanvasData = fragments;
+          this._lastRenderedCanvasAt = Date.now();
+          this.logDebug("canvas-data-cached", { canvases: fragments.length });
+        }
+      });
+
       if (!this.issues?.length) return;
       this.logDebug("canvas-rendered-event", event.detail || {});
       this.scheduleRecalculate("canvas-rendered");
@@ -133,6 +146,8 @@ export const DocsHighlighter = {
     }
 
     this.currentRects = new Map();
+    this._lastRenderedCanvasData = null;
+    this._lastRenderedCanvasAt = 0;
     this.issueMarkers.forEach((markers) => {
       markers.forEach((marker) => marker.remove());
     });
@@ -188,15 +203,24 @@ export const DocsHighlighter = {
     }
 
     // Fall back to canvas-fragment approach (GDocs renders in <canvas> without accessibility mode).
-    const canvasData = await this.requestCanvasFragments();
+    let canvasData = await this.requestCanvasFragments();
     if (generation !== this._recalcGeneration) return;
 
     if (!canvasData.length) {
-      this.logDebug("canvas-empty", {
-        hadTextRoot: Boolean(textRoot),
-      });
-      this.renderMarkers(domIssueRects || new Map());
-      return;
+      // Si los canvas tiles del render inicial ya fueron desconectados por GDocs
+      // (lifecycle normal de tile virtualization), usar el caché del último canvas-rendered.
+      const cacheAgeMs = Date.now() - (this._lastRenderedCanvasAt || 0);
+      if (this._lastRenderedCanvasData?.length && cacheAgeMs < 8000) {
+        this.logDebug("canvas-cache-fallback", { cacheAgeMs });
+        canvasData = this._lastRenderedCanvasData;
+      } else {
+        this.logDebug("canvas-empty", {
+          hadTextRoot: Boolean(textRoot),
+          cacheAgeMs,
+        });
+        this.renderMarkers(domIssueRects || new Map());
+        return;
+      }
     }
 
     const sortedFragments = this.buildSortedFragments(canvasData);

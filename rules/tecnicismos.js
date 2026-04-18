@@ -120,6 +120,21 @@ export const tecnicismosRule = {
       sugerencias: ["firma de puño y letra"],
       palabrasClaves: "autógrafa",
     },
+    {
+      original: "estipulaciones",
+      sugerencias: ["condiciones", "términos"],
+      palabrasClaves: "estipulaciones",
+    },
+    {
+      original: "estipulación",
+      sugerencias: ["condición", "término"],
+      palabrasClaves: "estipulación",
+    },
+    {
+      original: "estipular",
+      sugerencias: ["acordar", "establecer"],
+      palabrasClaves: "estipular",
+    },
   ],
 
   detectar(texto) {

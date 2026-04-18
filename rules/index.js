@@ -5,6 +5,7 @@ import rodeosRule from "./rodeos.js";
 import vozPasivaRule from "./voz-pasiva.js";
 import queismoRule from "./queismo.js";
 import nominalizacionRule from "./nominalizacion.js";
+import numerosRule from "./numeros.js";
 
 export { accentInsensitiveUtils } from "./shared.js";
 
@@ -16,4 +17,5 @@ export const rules = [
   vozPasivaRule,
   queismoRule,
   nominalizacionRule,
+  numerosRule,
 ];

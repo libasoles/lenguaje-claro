@@ -54,7 +54,14 @@ npm run watch
 3. Hacer clic en "Cargar extensión sin empaquetar"
 4. Seleccionar la carpeta `lenguaje-claro/dist`
 
-### 4. Usar la extensión
+### 4. Configurar permisos en Google Cloud Console
+
+La extensión usa la API de Google Docs para leer y escribir documentos. Es necesario:
+
+1. Habilita Google Docs API con permisos de **lectura y escritura** en <https://console.cloud.google.com/apis/library?project=your-project-name>
+2. En [Google Cloud Console - Credenciales](https://console.cloud.google.com/apis/credentials?project=your-project-name), dentro de OAuth Client IDs, configurar el **ID de la extensión** de Chrome (se obtiene desde `chrome://extensions` una vez cargada)
+
+### 5. Usar la extensión
 
 1. Abrir un documento en [Google Docs](https://docs.google.com)
 2. La extensión se inicializará automáticamente
@@ -114,8 +121,8 @@ export const nuevaReglaRule = {
 export default nuevaReglaRule;
 ```
 
-3. Importar la nueva regla en `rules/index.js` y agregarla al array `rules`
-4. Correr `npm run build` o dejar `npm run watch` activo
+1. Importar la nueva regla en `rules/index.js` y agregarla al array `rules`
+2. Correr `npm run build` o dejar `npm run watch` activo
 
 ### Tests
 

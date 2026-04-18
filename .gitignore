@@ -3,4 +3,5 @@ dist/
 .claude/
 TODO.md
 ROADMAP.md
+LOG.md
 .env
