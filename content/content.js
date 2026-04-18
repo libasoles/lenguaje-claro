@@ -16,12 +16,11 @@ export const DocsReviewer = {
   isInitialized: false,
   sourceText: "",
   sourceSegments: [],
-  undoStack: [],
-  isUndoInFlight: false,
   isAnalyzing: false,
   _pendingReanalysis: false,
   _analysisRunId: 0,
   _lastAnalysisStartedAt: 0,
+  _reanalizarTimer: null,
 
   async init() {
     if (this.isInitialized) return;
@@ -38,7 +37,6 @@ export const DocsReviewer = {
 
     await DocsPanel.inyectar();
     DocsHighlighter.inicializar();
-    this.inicializarUndo();
     await this.analizarDocumento({ interactive: false });
 
     this.isInitialized = true;
@@ -317,221 +315,53 @@ export const DocsReviewer = {
       "(simplifica dividiendo en múltiples oraciones)",
       "(considera usar voz activa)",
     ];
-    if (sugerencia && !PLACEHOLDER_SUGGESTIONS.includes(sugerencia)) {
-      const docId = DocsReader.getDocumentId();
-      if (!docId) return;
-
-      const apiRange = this.mapStringRangeToApiRange(
-        this.sourceSegments,
-        issue.inicio,
-        issue.fin,
-      );
-      if (!apiRange) {
-        alert("No se pudo ubicar el texto a reemplazar en Google Docs.");
-        return;
-      }
-
-      try {
-        const response = await DocsRuntime.sendMessage({
-          type: "APPLY_REPLACEMENT",
-          docId,
-          original: issue.textoOriginal,
-          replacement: sugerencia,
-          range: apiRange,
-        });
-
-        if (response?.success) {
-          this.undoStack.push({
-            originalText: issue.textoOriginal,
-            replacementText: sugerencia,
-            sourceStart: issue.inicio,
-          });
-          await this.analizarDocumento();
-          return;
-        }
-
-        console.error("[Legal Docs] Error de API:", response?.error);
-        alert(
-          "Error al aplicar la corrección: " +
-            (response?.error || "desconocido"),
-        );
-      } catch (error) {
-        if (this.esContextoExtensionInvalidado(error)) {
-          this.manejarContextoExtensionInvalidado(error);
-          return;
-        }
-
-        console.error(
-          "[Legal Docs] Error al aplicar corrección:",
-          error?.originalMessage || error?.message || error,
-        );
-        alert("Error al aplicar la corrección. Inténtalo de nuevo.");
-      }
+    if (!sugerencia || PLACEHOLDER_SUGGESTIONS.includes(sugerencia)) {
+      this.enfocarIssue(issue.id, { showPopup: true, pinPopup: true });
       return;
     }
 
-    this.enfocarIssue(issue.id, { showPopup: true, pinPopup: true });
-  },
-
-  inicializarUndo() {
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        const isUndoShortcut =
-          (event.ctrlKey || event.metaKey) &&
-          !event.shiftKey &&
-          event.key.toLowerCase() === "z";
-
-        if (!isUndoShortcut || !this.undoStack.length || this.isUndoInFlight) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void this.deshacerUltimoCambio();
-      },
-      true,
-    );
-  },
-
-  async deshacerUltimoCambio() {
-    const lastChange = this.undoStack[this.undoStack.length - 1];
-    if (!lastChange) return;
-
-    const docId = DocsReader.getDocumentId();
-    if (!docId) return;
-
-    this.isUndoInFlight = true;
-
     try {
-      const documento = await DocsReader.leerDocumento({ interactive: true });
-      if (!documento?.text) {
-        if (
-          DocsReader.lastReadError?.code === "EXTENSION_CONTEXT_INVALIDATED"
-        ) {
-          this.manejarContextoExtensionInvalidado(DocsReader.lastReadError);
-          return;
-        }
-
-        throw new Error(
-          "No se pudo leer el documento para deshacer el cambio.",
-        );
-      }
-
-      const replacementStart = this.findNearestOccurrence(
-        documento.text,
-        lastChange.replacementText,
-        lastChange.sourceStart,
-      );
-
-      if (replacementStart < 0) {
-        throw new Error("No se encontró el cambio aplicado para deshacerlo.");
-      }
-
-      const replacementEnd =
-        replacementStart + lastChange.replacementText.length;
-      const apiRange = this.mapStringRangeToApiRange(
-        documento.segments,
-        replacementStart,
-        replacementEnd,
-      );
-
-      if (!apiRange) {
-        throw new Error("No se pudo mapear el cambio al documento actual.");
-      }
-
-      const response = await DocsRuntime.sendMessage({
-        type: "APPLY_REPLACEMENT",
-        docId,
-        original: lastChange.replacementText,
-        replacement: lastChange.originalText,
-        range: apiRange,
+      await DocsEditor.aplicarReemplazo({
+        inicio: issue.inicio,
+        fin: issue.fin,
+        textoOriginal: issue.textoOriginal,
+        textoReemplazo: sugerencia,
       });
 
-      if (!response?.success) {
-        throw new Error(response?.error || "No se pudo deshacer el cambio.");
-      }
-
-      this.undoStack.pop();
-      await this.analizarDocumento();
+      this.allMatches = [];
+      this.issuesById = new Map();
+      this.activeIssueId = null;
+      DocsHighlighter.limpiar();
+      DocsPanel.mostrarCargando();
+      this.reanalizarTrasEdicion();
     } catch (error) {
       if (this.esContextoExtensionInvalidado(error)) {
         this.manejarContextoExtensionInvalidado(error);
         return;
       }
 
-      console.error("[Legal Docs] Error al deshacer cambio:", error);
-      alert(error.message || "No se pudo deshacer el cambio.");
-    } finally {
-      this.isUndoInFlight = false;
+      console.error(
+        "[Legal Docs] Error al aplicar corrección:",
+        error?.originalMessage || error?.message || error,
+      );
+      DocsPanel.mostrarToastError(
+        "Error al aplicar: " + (error?.message || "desconocido"),
+      );
     }
   },
 
-  findNearestOccurrence(text, fragment, approximateIndex = 0) {
-    if (!text || !fragment) return -1;
-
-    let fromIndex = 0;
-    let nearestIndex = -1;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-
-    while (fromIndex <= text.length) {
-      const foundIndex = text.indexOf(fragment, fromIndex);
-      if (foundIndex < 0) break;
-
-      const distance = Math.abs(foundIndex - approximateIndex);
-      if (distance < nearestDistance) {
-        nearestIndex = foundIndex;
-        nearestDistance = distance;
-      }
-
-      fromIndex = foundIndex + 1;
-    }
-
-    return nearestIndex;
-  },
-
-  mapStringRangeToApiRange(segments, start, end) {
-    const startIndex = this.mapStringPositionToApiIndex(segments, start);
-    const endIndex = this.mapStringPositionToApiIndex(segments, end);
-
-    if (!Number.isInteger(startIndex) || !Number.isInteger(endIndex)) {
-      return null;
-    }
-
-    if (endIndex <= startIndex) {
-      return null;
-    }
-
-    return { startIndex, endIndex };
-  },
-
-  mapStringPositionToApiIndex(segments, position) {
-    if (
-      !Array.isArray(segments) ||
-      !Number.isInteger(position) ||
-      position < 0
-    ) {
-      return null;
-    }
-
-    for (const segment of segments) {
-      const segmentStart = segment.strStart;
-      const segmentEnd = segment.strStart + segment.length;
-
-      if (position < segmentStart || position > segmentEnd) {
-        continue;
-      }
-
-      return segment.apiStart + (position - segmentStart);
-    }
-
-    return null;
+  reanalizarTrasEdicion() {
+    // Damos un respiro para que Docs sincronice el cambio con el server
+    // antes de releer via OAuth; si no, la regla podría reanalizar texto viejo.
+    if (this._reanalizarTimer) clearTimeout(this._reanalizarTimer);
+    this._reanalizarTimer = setTimeout(() => {
+      this._reanalizarTimer = null;
+      void this.analizarDocumento();
+    }, 700);
   },
 };
 
 setReviewerActions(DocsReviewer);
 DocsReviewer.init();
-
-void DocsEditor;
 
 export default DocsReviewer;

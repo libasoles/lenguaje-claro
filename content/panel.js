@@ -106,6 +106,32 @@ export const DocsPanel = {
       });
   },
 
+  mostrarToastError(mensaje, duracionMs = 4000) {
+    const existing = document.getElementById("docs-reviewer-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.id = "docs-reviewer-toast";
+    toast.textContent = mensaje;
+    Object.assign(toast.style, {
+      position: "fixed",
+      bottom: "24px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#c0392b",
+      color: "#fff",
+      padding: "10px 18px",
+      borderRadius: "6px",
+      fontSize: "13px",
+      zIndex: "2147483647",
+      maxWidth: "360px",
+      textAlign: "center",
+      boxShadow: "0 2px 8px rgba(0,0,0,.3)",
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), duracionMs);
+  },
+
   mostrarErrorExtensionRecargada() {
     this.mostrarError(
       DocsRuntime.INVALIDATED_CONTEXT_MESSAGE ||

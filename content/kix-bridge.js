@@ -133,20 +133,36 @@ import "./canvas-patcher.js";
     }
   }
 
+  function selectionMatches(start, end) {
+    if (typeof accessor?.getSelection !== 'function') return false;
+    try {
+      const sel = accessor.getSelection();
+      if (!sel) return false;
+      const ranges = Array.isArray(sel) ? sel : [sel];
+      return ranges.some(
+        (range) => range && Number(range.start) === start && Number(range.end) === end,
+      );
+    } catch (error) {
+      console.warn(`${PREFIX} getSelection threw:`, error);
+      return false;
+    }
+  }
+
   async function setSelectionWithFallback(start, end) {
     if (!accessor || typeof accessor.setSelection !== 'function') {
       return { ok: false, error: 'accessor-not-ready' };
     }
 
     try {
-      const firstTry = await accessor.setSelection(start, end);
-      if (firstTry) return { ok: true };
+      await accessor.setSelection(start, end);
+      if (selectionMatches(start, end)) return { ok: true };
 
-      console.log(`${PREFIX} setSelection returned falsy; attempting ArrowRight wake-up`);
+      console.log(`${PREFIX} setSelection did not stick; attempting ArrowRight wake-up`);
       wakeUpSelectionSystem();
 
-      const retry = await accessor.setSelection(start, end);
-      if (retry) return { ok: true };
+      await accessor.setSelection(start, end);
+      if (selectionMatches(start, end)) return { ok: true };
+
       return { ok: false, error: 'set-selection-failed' };
     } catch (error) {
       console.warn(`${PREFIX} setSelection threw:`, error);

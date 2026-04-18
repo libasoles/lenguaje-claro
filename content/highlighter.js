@@ -219,10 +219,40 @@ export const DocsHighlighter = {
     });
     if (this._lastCanvasMappingStats) {
       this.logDebug("canvas-map-summary", this._lastCanvasMappingStats);
+      this.logDebug("canvas-map-summary-line", {
+        summary: this.formatCanvasMappingStats(this._lastCanvasMappingStats),
+      });
     }
     if (generation === this._recalcGeneration) {
       this.renderMarkers(mergedIssueRects);
     }
+  },
+
+  formatCanvasMappingStats(stats) {
+    if (!stats) return "no-stats";
+
+    const misses = Array.isArray(stats.sampleMisses)
+      ? stats.sampleMisses
+          .map((miss) => {
+            const text = String(miss.texto || "")
+              .replace(/\s+/g, " ")
+              .trim();
+            return `${miss.regla}:${miss.reason}:${text}`;
+          })
+          .join(" | ")
+      : "";
+
+    return [
+      `issues=${stats.issueCount}`,
+      `visible=${stats.visibleIssues}`,
+      `range=${stats.matchedByRange}`,
+      `fallback=${stats.matchedByFallback}`,
+      `noTextMatch=${stats.noTextMatch}`,
+      `noRectsAfterMatch=${stats.noRectsAfterMatch}`,
+      misses ? `sampleMisses=${misses}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ; ");
   },
 
   scheduleRecalculate(reason = "unknown") {
@@ -941,6 +971,8 @@ export const DocsHighlighter = {
     this.issueMarkers.clear();
 
     if (!this.overlayElement) return;
+    this.overlayElement.style.display = "block";
+    this.overlayElement.style.visibility = "visible";
 
     issueRects.forEach((rects, issueId) => {
       const issue = getReviewerActions().getIssue(issueId);
@@ -956,6 +988,15 @@ export const DocsHighlighter = {
         marker.style.top = `${Math.max(rect.bottom - 10, rect.top)}px`;
         marker.style.width = `${rect.width}px`;
         marker.style.height = `${Math.max(12, Math.min(rect.height + 8, 20))}px`;
+        marker.style.display = "block";
+        marker.style.visibility = "visible";
+        marker.style.opacity = "1";
+        marker.style.boxSizing = "border-box";
+        marker.style.backgroundImage =
+          `linear-gradient(90deg, ${issue.color} 0 42%, transparent 42% 58%, ${issue.color} 58% 100%)`;
+        marker.style.backgroundSize = "10px 4px";
+        marker.style.backgroundRepeat = "repeat-x";
+        marker.style.backgroundPosition = "left calc(100% - 2px)";
         marker.style.setProperty(
           "--docs-reviewer-highlight-color",
           issue.color,
@@ -1292,7 +1333,6 @@ export const DocsHighlighter = {
       };
       document.addEventListener("docs-reviewer-fragments-data", eventHandler);
       window.addEventListener("message", messageHandler);
-      document.dispatchEvent(new Event("docs-reviewer-request-fragments"));
       timeoutId = setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -1301,6 +1341,7 @@ export const DocsHighlighter = {
         this.logDebug("canvas-fragments-timeout", { timeout });
         resolve([]);
       }, timeout);
+      document.dispatchEvent(new Event("docs-reviewer-request-fragments"));
     });
   },
 
