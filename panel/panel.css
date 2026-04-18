@@ -182,6 +182,107 @@
   gap: 0;
 }
 
+/* Sort toolbar */
+.docs-reviewer-sort-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e8ecf0;
+  background: #f9f9f9;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.docs-reviewer-sort-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #888;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.docs-reviewer-sort-btn:hover {
+  background: #f0f0f0;
+  color: #444;
+}
+
+.docs-reviewer-sort-btn--active {
+  color: #1a73e8;
+  font-weight: 600;
+  background: #eef4ff;
+}
+
+/* Section title (grouped mode) */
+.docs-reviewer-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #555;
+  padding: 14px 16px 6px;
+  margin-top: 0;
+  position: sticky;
+  top: 35px;
+  z-index: 1;
+  background: #fff;
+}
+
+.docs-reviewer-section-title::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.docs-reviewer-section-title[data-regla="arcaismos"]::before {
+  background: #e74c3c;
+}
+.docs-reviewer-section-title[data-regla="voz-pasiva"]::before {
+  background: #f39c12;
+}
+.docs-reviewer-section-title[data-regla="queismo"]::before {
+  background: #f1c40f;
+}
+.docs-reviewer-section-title[data-regla="tecnicismos"]::before {
+  background: #e67e22;
+}
+.docs-reviewer-section-title[data-regla="vaguedades"]::before {
+  background: #8e44ad;
+}
+.docs-reviewer-section-title[data-regla="rodeos"]::before {
+  background: #16a085;
+}
+.docs-reviewer-section-title[data-regla="numeros"]::before {
+  background: #2980b9;
+}
+.docs-reviewer-section-title[data-regla="nominalizacion"]::before {
+  background: #27ae60;
+}
+
+/* Issue section container — space between cards */
+.docs-reviewer-issue-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.docs-reviewer-issue-section .docs-reviewer-issue {
+  border-bottom: none;
+  border-radius: 6px;
+  border: 1px solid #eaecf0;
+}
+
 .docs-reviewer-placeholder {
   margin: 16px;
   padding: 18px 16px;
@@ -267,13 +368,11 @@
   background: #8e44ad;
 }
 
-.docs-reviewer-issue[data-regla="rodeos"]
-  .docs-reviewer-issue-regla::before {
+.docs-reviewer-issue[data-regla="rodeos"] .docs-reviewer-issue-regla::before {
   background: #16a085;
 }
 
-.docs-reviewer-issue[data-regla="numeros"]
-  .docs-reviewer-issue-regla::before {
+.docs-reviewer-issue[data-regla="numeros"] .docs-reviewer-issue-regla::before {
   background: #2980b9;
 }
 

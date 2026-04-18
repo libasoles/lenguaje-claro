@@ -9,6 +9,8 @@ export const DocsPanel = {
   issueElements: new Map(),
   activeIssueId: null,
   isVisible: true,
+  sortMode: "posicion",
+  lastMatches: [],
 
   async inyectar() {
     try {
@@ -64,7 +66,9 @@ export const DocsPanel = {
 
     const reanalBtn = document.getElementById("docs-reviewer-reanalizar");
     if (reanalBtn) {
-      reanalBtn.addEventListener("click", () => getReviewerActions().analizarDocumento());
+      reanalBtn.addEventListener("click", () =>
+        getReviewerActions().analizarDocumento(),
+      );
     }
   },
 
@@ -142,6 +146,7 @@ export const DocsPanel = {
   actualizarIssues(allMatches) {
     if (!this.issuesContainer) return;
 
+    this.lastMatches = allMatches;
     this.issuesContainer.innerHTML = "";
     this.issueElements.clear();
     this.activeIssueId = null;
@@ -152,116 +157,161 @@ export const DocsPanel = {
       return;
     }
 
-    const porRegla = {};
-    allMatches.forEach((match) => {
-      if (!porRegla[match.regla]) {
-        porRegla[match.regla] = [];
-      }
-      porRegla[match.regla].push(match);
+    // Sort toolbar
+    const toolbar = document.createElement("div");
+    toolbar.className = "docs-reviewer-sort-toolbar";
+
+    const btnRegla = document.createElement("button");
+    btnRegla.className =
+      "docs-reviewer-sort-btn" +
+      (this.sortMode === "regla" ? " docs-reviewer-sort-btn--active" : "");
+    btnRegla.textContent = "Por regla";
+    btnRegla.addEventListener("click", () => {
+      this.sortMode = "regla";
+      this.actualizarIssues(this.lastMatches);
     });
 
-    rules.forEach((regla) => {
-      const issues = porRegla[regla.id] || [];
-      if (!issues.length) return;
+    const btnPosicion = document.createElement("button");
+    btnPosicion.className =
+      "docs-reviewer-sort-btn" +
+      (this.sortMode === "posicion" ? " docs-reviewer-sort-btn--active" : "");
+    btnPosicion.textContent = "Por aparición";
+    btnPosicion.addEventListener("click", () => {
+      this.sortMode = "posicion";
+      this.actualizarIssues(this.lastMatches);
+    });
 
-      const sectionDiv = document.createElement("div");
-      sectionDiv.className = "docs-reviewer-issue-section";
+    toolbar.appendChild(btnPosicion);
+    toolbar.appendChild(btnRegla);
+    this.issuesContainer.appendChild(toolbar);
 
-      issues.forEach((issue, idx) => {
-        const issueDiv = document.createElement("div");
-        issueDiv.className = "docs-reviewer-issue";
-        issueDiv.setAttribute("data-regla", issue.regla);
-        issueDiv.setAttribute("data-issue-id", issue.id);
-
-        const reglaElement = document.createElement("div");
-        reglaElement.className = "docs-reviewer-issue-regla";
-        reglaElement.innerHTML = `<span class="docs-reviewer-issue-color">${regla.nombre}</span><span class="docs-reviewer-issue-counter">${idx + 1}/${issues.length}</span>`;
-
-        const originalElement = document.createElement("div");
-        originalElement.className = "docs-reviewer-issue-original";
-        this.resaltarProblema(
-          originalElement,
-          issue.textoOriginal,
-          issue.regla,
-        );
-
-        issueDiv.appendChild(reglaElement);
-        issueDiv.appendChild(originalElement);
-
-        const PLACEHOLDER_SUGGESTIONS = [
-          "(simplifica dividiendo en múltiples oraciones)",
-          "(considera usar voz activa)",
-        ];
-        const hasMultipleSugerencias =
-          Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
-        const canApplyFromPanel =
-          issue.sugerencia &&
-          issue.aplicable !== false &&
-          !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
-
-        if (!hasMultipleSugerencias && issue.sugerencia) {
-          if (canApplyFromPanel) {
-            const suggestionElement = document.createElement("div");
-            suggestionElement.className = "docs-reviewer-issue-sugerencia";
-            suggestionElement.innerHTML = `<strong>Sugerencia:</strong> ${issue.sugerencia}`;
-            issueDiv.appendChild(suggestionElement);
-          } else if (issue.aplicable === false) {
-            const hintElement = document.createElement("div");
-            hintElement.className = "docs-reviewer-issue-hint";
-            hintElement.innerHTML = `<strong>Sugerencia:</strong> ${issue.sugerencia}`;
-            issueDiv.appendChild(hintElement);
-          }
-        }
-
-        if (hasMultipleSugerencias) {
-          const buttonGroup = document.createElement("div");
-          buttonGroup.className = "docs-reviewer-issue-button-group";
-          issue.sugerencias.forEach((s) => {
-            const btn = document.createElement("button");
-            btn.className =
-              "docs-reviewer-issue-button docs-reviewer-issue-button-option";
-            btn.textContent = s;
-            btn.addEventListener("click", (event) => {
-              event.stopPropagation();
-              getReviewerActions().aplicarCorreccion(issue.id, s);
-            });
-            buttonGroup.appendChild(btn);
-          });
-          issueDiv.appendChild(buttonGroup);
-        } else if (issue.aplicable !== false) {
-          const buttonElement = document.createElement("button");
-          buttonElement.className = "docs-reviewer-issue-button";
-          buttonElement.textContent = canApplyFromPanel
-            ? "Aplicar cambio"
-            : "Ver en documento";
-          buttonElement.addEventListener("click", (event) => {
-            event.stopPropagation();
-            getReviewerActions().aplicarCorreccion(issue.id);
-          });
-          issueDiv.appendChild(buttonElement);
-        }
-        issueDiv.addEventListener("mouseenter", () => {
-          getReviewerActions().setIssueActivo(issue.id, { showPopup: false });
-        });
-        issueDiv.addEventListener("mouseleave", () => {
-          if (getReviewerActions().activeIssueId === issue.id) {
-            getReviewerActions().limpiarIssueActivo({ preservePinnedPopup: true });
-          }
-        });
-        issueDiv.addEventListener("click", () => {
-          getReviewerActions().enfocarIssue(issue.id, {
-            showPopup: true,
-            pinPopup: true,
-            scrollPanel: false,
-          });
-        });
-
+    if (this.sortMode === "posicion") {
+      allMatches.forEach((issue) => {
+        const issueDiv = this._crearIssueDiv(issue, { showRegla: true });
         this.issueElements.set(issue.id, issueDiv);
-        sectionDiv.appendChild(issueDiv);
+        this.issuesContainer.appendChild(issueDiv);
+      });
+    } else {
+      const porRegla = {};
+      allMatches.forEach((match) => {
+        if (!porRegla[match.regla]) {
+          porRegla[match.regla] = [];
+        }
+        porRegla[match.regla].push(match);
       });
 
-      this.issuesContainer.appendChild(sectionDiv);
+      rules.forEach((regla) => {
+        const issues = porRegla[regla.id] || [];
+        if (!issues.length) return;
+
+        const sectionTitle = document.createElement("div");
+        sectionTitle.className = "docs-reviewer-section-title";
+        sectionTitle.setAttribute("data-regla", regla.id);
+        sectionTitle.textContent = regla.nombre;
+        this.issuesContainer.appendChild(sectionTitle);
+
+        const sectionDiv = document.createElement("div");
+        sectionDiv.className = "docs-reviewer-issue-section";
+
+        issues.forEach((issue) => {
+          const issueDiv = this._crearIssueDiv(issue, { showRegla: false });
+          this.issueElements.set(issue.id, issueDiv);
+          sectionDiv.appendChild(issueDiv);
+        });
+
+        this.issuesContainer.appendChild(sectionDiv);
+      });
+    }
+  },
+
+  _crearIssueDiv(issue, { showRegla }) {
+    const issueDiv = document.createElement("div");
+    issueDiv.className = "docs-reviewer-issue";
+    issueDiv.setAttribute("data-regla", issue.regla);
+    issueDiv.setAttribute("data-issue-id", issue.id);
+
+    if (showRegla) {
+      const reglaElement = document.createElement("div");
+      reglaElement.className = "docs-reviewer-issue-regla";
+      reglaElement.innerHTML = `<span class="docs-reviewer-issue-color">${issue.reglaNombre}</span>`;
+      issueDiv.appendChild(reglaElement);
+    }
+
+    const originalElement = document.createElement("div");
+    originalElement.className = "docs-reviewer-issue-original";
+    this.resaltarProblema(originalElement, issue.textoOriginal, issue.regla);
+    issueDiv.appendChild(originalElement);
+
+    const PLACEHOLDER_SUGGESTIONS = [
+      "(simplifica dividiendo en múltiples oraciones)",
+      "(considera usar voz activa)",
+    ];
+    const hasMultipleSugerencias =
+      Array.isArray(issue.sugerencias) && issue.sugerencias.length > 1;
+    const canApplyFromPanel =
+      issue.sugerencia &&
+      issue.aplicable !== false &&
+      !PLACEHOLDER_SUGGESTIONS.includes(issue.sugerencia);
+
+    if (!hasMultipleSugerencias && issue.sugerencia) {
+      if (canApplyFromPanel) {
+        const suggestionElement = document.createElement("div");
+        suggestionElement.className = "docs-reviewer-issue-sugerencia";
+        suggestionElement.innerHTML = issue.sugerencia;
+        issueDiv.appendChild(suggestionElement);
+      } else if (issue.aplicable === false) {
+        const hintElement = document.createElement("div");
+        hintElement.className = "docs-reviewer-issue-hint";
+        hintElement.innerHTML = issue.sugerencia;
+        issueDiv.appendChild(hintElement);
+      }
+    }
+
+    if (hasMultipleSugerencias) {
+      const buttonGroup = document.createElement("div");
+      buttonGroup.className = "docs-reviewer-issue-button-group";
+      issue.sugerencias.forEach((s) => {
+        const btn = document.createElement("button");
+        btn.className =
+          "docs-reviewer-issue-button docs-reviewer-issue-button-option";
+        btn.textContent = s;
+        btn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          getReviewerActions().aplicarCorreccion(issue.id, s);
+        });
+        buttonGroup.appendChild(btn);
+      });
+      issueDiv.appendChild(buttonGroup);
+    } else if (issue.aplicable !== false) {
+      const buttonElement = document.createElement("button");
+      buttonElement.className = "docs-reviewer-issue-button";
+      buttonElement.textContent = canApplyFromPanel
+        ? "Aplicar cambio"
+        : "Ver en documento";
+      buttonElement.addEventListener("click", (event) => {
+        event.stopPropagation();
+        getReviewerActions().aplicarCorreccion(issue.id);
+      });
+      issueDiv.appendChild(buttonElement);
+    }
+
+    issueDiv.addEventListener("mouseenter", () => {
+      getReviewerActions().setIssueActivo(issue.id, { showPopup: false });
     });
+    issueDiv.addEventListener("mouseleave", () => {
+      if (getReviewerActions().activeIssueId === issue.id) {
+        getReviewerActions().limpiarIssueActivo({ preservePinnedPopup: true });
+      }
+    });
+    issueDiv.addEventListener("click", () => {
+      getReviewerActions().enfocarIssue(issue.id, {
+        showPopup: true,
+        pinPopup: true,
+        scrollPanel: false,
+      });
+    });
+
+    return issueDiv;
   },
 
   resaltarProblema(container, texto, regla) {
