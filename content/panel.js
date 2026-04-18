@@ -6,6 +6,7 @@ import { rules } from "../rules/index.js";
 export const DocsPanel = {
   panelElement: null,
   issuesContainer: null,
+  toolbarElement: null,
   issueElements: new Map(),
   activeIssueId: null,
   isVisible: true,
@@ -17,6 +18,7 @@ export const DocsPanel = {
       await DocsReader.esperarDocumentoListo();
 
       const logoURL = DocsRuntime.getURL("assets/icons/logo.svg");
+      this.logoURL = logoURL;
       const logoMarkup = logoURL
         ? `<img src="${logoURL}" class="docs-reviewer-logo" alt="" />`
         : "";
@@ -39,8 +41,12 @@ export const DocsPanel = {
             </div>
           </div>
           <div class="docs-reviewer-content">
+            <div id="docs-reviewer-toolbar" class="docs-reviewer-sort-toolbar">
+              <button id="docs-reviewer-sort-posicion" class="docs-reviewer-sort-btn docs-reviewer-sort-btn--active">Por aparición</button>
+              <button id="docs-reviewer-sort-regla" class="docs-reviewer-sort-btn">Por regla</button>
+            </div>
             <div id="docs-reviewer-issues" class="docs-reviewer-issues">
-              <p class="docs-reviewer-placeholder">Analizando documento...</p>
+              ${DocsPanel._skeletonHTML()}
             </div>
           </div>
         </div>
@@ -52,6 +58,7 @@ export const DocsPanel = {
       document.body.appendChild(this.panelElement);
 
       this.issuesContainer = document.getElementById("docs-reviewer-issues");
+      this.toolbarElement = document.getElementById("docs-reviewer-toolbar");
       this.agregarEventListeners();
     } catch (e) {
       console.error("Error al inyectar el panel:", e);
@@ -70,6 +77,22 @@ export const DocsPanel = {
         getReviewerActions().analizarDocumento(),
       );
     }
+
+    const sortPosicion = document.getElementById("docs-reviewer-sort-posicion");
+    if (sortPosicion) {
+      sortPosicion.addEventListener("click", () => {
+        this.sortMode = "posicion";
+        this.actualizarIssues(this.lastMatches);
+      });
+    }
+
+    const sortRegla = document.getElementById("docs-reviewer-sort-regla");
+    if (sortRegla) {
+      sortRegla.addEventListener("click", () => {
+        this.sortMode = "regla";
+        this.actualizarIssues(this.lastMatches);
+      });
+    }
   },
 
   mostrarCargando() {
@@ -77,9 +100,20 @@ export const DocsPanel = {
     this.issueElements.clear();
 
     if (this.issuesContainer) {
-      this.issuesContainer.innerHTML =
-        '<p class="docs-reviewer-placeholder">Analizando documento...</p>';
+      this.issuesContainer.innerHTML = DocsPanel._skeletonHTML();
     }
+  },
+
+  _skeletonHTML() {
+    const card = () => `
+      <div class="docs-reviewer-skeleton-card">
+        <div class="docs-reviewer-skeleton docs-reviewer-skeleton-badge"></div>
+        <div class="docs-reviewer-skeleton docs-reviewer-skeleton-line" style="width:90%"></div>
+        <div class="docs-reviewer-skeleton docs-reviewer-skeleton-line" style="width:70%"></div>
+        <div class="docs-reviewer-skeleton docs-reviewer-skeleton-line docs-reviewer-skeleton-line--suggestion" style="width:80%"></div>
+        <div class="docs-reviewer-skeleton docs-reviewer-skeleton-btn"></div>
+      </div>`;
+    return `<div class="docs-reviewer-skeleton-list">${card()}${card()}${card()}</div>`;
   },
 
   mostrarError(mensaje) {
@@ -143,6 +177,13 @@ export const DocsPanel = {
     );
   },
 
+  _actualizarToolbar() {
+    const btnPosicion = document.getElementById("docs-reviewer-sort-posicion");
+    const btnRegla = document.getElementById("docs-reviewer-sort-regla");
+    if (btnPosicion) btnPosicion.classList.toggle("docs-reviewer-sort-btn--active", this.sortMode === "posicion");
+    if (btnRegla) btnRegla.classList.toggle("docs-reviewer-sort-btn--active", this.sortMode === "regla");
+  },
+
   actualizarIssues(allMatches) {
     if (!this.issuesContainer) return;
 
@@ -150,40 +191,13 @@ export const DocsPanel = {
     this.issuesContainer.innerHTML = "";
     this.issueElements.clear();
     this.activeIssueId = null;
+    this._actualizarToolbar();
 
     if (allMatches.length === 0) {
       this.issuesContainer.innerHTML =
         '<p class="docs-reviewer-placeholder docs-reviewer-placeholder-success">✓ No se encontraron problemas</p>';
       return;
     }
-
-    // Sort toolbar
-    const toolbar = document.createElement("div");
-    toolbar.className = "docs-reviewer-sort-toolbar";
-
-    const btnRegla = document.createElement("button");
-    btnRegla.className =
-      "docs-reviewer-sort-btn" +
-      (this.sortMode === "regla" ? " docs-reviewer-sort-btn--active" : "");
-    btnRegla.textContent = "Por regla";
-    btnRegla.addEventListener("click", () => {
-      this.sortMode = "regla";
-      this.actualizarIssues(this.lastMatches);
-    });
-
-    const btnPosicion = document.createElement("button");
-    btnPosicion.className =
-      "docs-reviewer-sort-btn" +
-      (this.sortMode === "posicion" ? " docs-reviewer-sort-btn--active" : "");
-    btnPosicion.textContent = "Por aparición";
-    btnPosicion.addEventListener("click", () => {
-      this.sortMode = "posicion";
-      this.actualizarIssues(this.lastMatches);
-    });
-
-    toolbar.appendChild(btnPosicion);
-    toolbar.appendChild(btnRegla);
-    this.issuesContainer.appendChild(toolbar);
 
     if (this.sortMode === "posicion") {
       allMatches.forEach((issue) => {
