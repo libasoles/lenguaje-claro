@@ -18,14 +18,8 @@ export const DocsHighlighter = {
   hidePopupTimer: null,
   mutationObserver: null,
   reanalysisTimer: null,
-  bootstrapRetryTimers: [],
   _recalcGeneration: 0,
   _measureCanvas: null,
-  _lastCanvasMappingStats: null,
-  _debugSessionId: null,
-  _debugStartedAt: 0,
-  _debugRecalcCount: 0,
-  _debugLastMissingTextRootAt: 0,
   _lastRenderedCanvasData: null,
   _lastRenderedCanvasAt: 0,
 
@@ -60,7 +54,7 @@ export const DocsHighlighter = {
       () => this.scheduleRecalculate("scroll"),
       true,
     );
-    document.addEventListener("docs-reviewer-canvas-rendered", (event) => {
+    document.addEventListener("docs-reviewer-canvas-rendered", () => {
       // Cachear fragmentos ANTES de verificar issues: GDocs suele renderizar antes
       // de que retorne la API OAuth. El caché permite usar esos fragmentos más tarde
       // aunque los canvas tiles se hayan desconectado para ese momento.
@@ -68,13 +62,11 @@ export const DocsHighlighter = {
         if (fragments.length > 0) {
           this._lastRenderedCanvasData = fragments;
           this._lastRenderedCanvasAt = Date.now();
-          this.logDebug("canvas-data-cached", { canvases: fragments.length });
         }
       });
 
       if (!this.issues?.length) return;
-      this.logDebug("canvas-rendered-event", event.detail || {});
-      this.scheduleRecalculate("canvas-rendered");
+      this.scheduleRecalculate();
     });
     document.addEventListener("click", (event) =>
       this.handleDocumentClick(event),
@@ -97,13 +89,9 @@ export const DocsHighlighter = {
       this.pinnedIssueId = null;
       this.hoverIssueId = null;
       this.activeIssueId = null;
-    }
-    this.startDebugSession({ issueCount: this.issues.length });
-    if (!preserveVisibleState) {
       this.renderMarkers(new Map());
     }
 
-    // Esperar a que el textRoot esté disponible
     const textRoot = await this.waitForTextRoot();
     if (!textRoot) {
       console.log(
@@ -111,39 +99,10 @@ export const DocsHighlighter = {
       );
     }
 
-    this.scheduleRecalculate(
-      textRoot ? "initial-bootstrap" : "initial-bootstrap-timeout",
-    );
+    this.scheduleRecalculate();
     this.observeTextRoot();
-    this.scheduleBootstrapRetry();
   },
 
-  getDebugNow() {
-    if (typeof performance !== "undefined" && performance?.now) {
-      return performance.now();
-    }
-    return Date.now();
-  },
-
-  startDebugSession(detail = {}) {
-    this._debugSessionId = `${Date.now().toString(36)}-${Math.random()
-      .toString(36)
-      .slice(2, 7)}`;
-    this._debugStartedAt = this.getDebugNow();
-    this._debugRecalcCount = 0;
-    this._debugLastMissingTextRootAt = 0;
-    this.logDebug("session-start", detail);
-  },
-
-  logDebug(stage, detail = {}) {
-    const startedAt = this._debugStartedAt || this.getDebugNow();
-    console.log("[Legal Docs][Highlighter]", {
-      session: this._debugSessionId,
-      t: Math.round((this.getDebugNow() - startedAt) * 10) / 10,
-      stage,
-      ...detail,
-    });
-  },
 
   limpiar(options = {}) {
     const preserveCanvasCache = Boolean(options.preserveCanvasCache);
@@ -157,7 +116,6 @@ export const DocsHighlighter = {
       clearTimeout(this.reanalysisTimer);
       this.reanalysisTimer = null;
     }
-    this.clearBootstrapRetry();
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
       this.mutationObserver = null;
@@ -175,7 +133,6 @@ export const DocsHighlighter = {
       this.issueMarkers.clear();
       this.hidePopup();
     }
-    this.logDebug("session-cleared");
   },
 
   async recalcularPosiciones() {
@@ -186,12 +143,6 @@ export const DocsHighlighter = {
     }
 
     const generation = ++this._recalcGeneration;
-    const recalcCount = ++this._debugRecalcCount;
-    this.logDebug("recalc-start", {
-      generation,
-      recalcCount,
-      issueCount: this.issues.length,
-    });
     let domIssueRects = null;
 
     // Try DOM approach first — works when accessibility mode is enabled in GDocs.
@@ -201,11 +152,8 @@ export const DocsHighlighter = {
       if (textModel.normalizedText.length > 0) {
         domIssueRects = this.mapIssuesToRects(textModel);
         const visibleIssues = this.countVisibleIssueRects(domIssueRects);
-        this.logDebug("dom-pass", {
-          root:
-            textRoot.getAttribute("role") ||
-            textRoot.className ||
-            textRoot.tagName,
+        console.log("[Legal Docs] Highlighter (DOM):", {
+          root: textRoot.getAttribute("role") || textRoot.className || textRoot.tagName,
           modelLength: textModel.normalizedText.length,
           issues: this.issues.length,
           visibleIssues,
@@ -217,10 +165,7 @@ export const DocsHighlighter = {
           return;
         }
 
-        this.logDebug("dom-incomplete-coverage", {
-          visibleIssues,
-          issueCount: this.issues.length,
-        });
+        console.log("[Legal Docs] Highlighter (DOM): incomplete coverage, trying canvas fallback");
       }
     }
 
@@ -233,13 +178,9 @@ export const DocsHighlighter = {
       // (lifecycle normal de tile virtualization), usar el caché del último canvas-rendered.
       const cacheAgeMs = Date.now() - (this._lastRenderedCanvasAt || 0);
       if (this._lastRenderedCanvasData?.length && cacheAgeMs < 8000) {
-        this.logDebug("canvas-cache-fallback", { cacheAgeMs });
         canvasData = this._lastRenderedCanvasData;
       } else {
-        this.logDebug("canvas-empty", {
-          hadTextRoot: Boolean(textRoot),
-          cacheAgeMs,
-        });
+        console.log("[Legal Docs] Highlighter: no text root and no canvas fragments");
         this.renderMarkers(domIssueRects || new Map());
         return;
       }
@@ -256,88 +197,27 @@ export const DocsHighlighter = {
       canvasIssueRects,
     );
     const visibleIssues = this.countVisibleIssueRects(mergedIssueRects);
-    this.logDebug("canvas-pass", {
+    console.log("[Legal Docs] Highlighter (canvas):", {
       canvases: canvasData.length,
       fragments: sortedFragments.length,
       modelLength: canvasTextModel.normalizedText.length,
       issues: this.issues.length,
       visibleIssues,
     });
-    if (this._lastCanvasMappingStats) {
-      this.logDebug("canvas-map-summary", this._lastCanvasMappingStats);
-      this.logDebug("canvas-map-summary-line", {
-        summary: this.formatCanvasMappingStats(this._lastCanvasMappingStats),
-      });
-    }
     if (generation === this._recalcGeneration) {
       this.renderMarkers(mergedIssueRects);
     }
   },
 
-  formatCanvasMappingStats(stats) {
-    if (!stats) return "no-stats";
 
-    const misses = Array.isArray(stats.sampleMisses)
-      ? stats.sampleMisses
-          .map((miss) => {
-            const text = String(miss.texto || "")
-              .replace(/\s+/g, " ")
-              .trim();
-            return `${miss.regla}:${miss.reason}:${text}`;
-          })
-          .join(" | ")
-      : "";
-
-    return [
-      `issues=${stats.issueCount}`,
-      `visible=${stats.visibleIssues}`,
-      `range=${stats.matchedByRange}`,
-      `fallback=${stats.matchedByFallback}`,
-      `noTextMatch=${stats.noTextMatch}`,
-      `noRectsAfterMatch=${stats.noRectsAfterMatch}`,
-      misses ? `sampleMisses=${misses}` : "",
-    ]
-      .filter(Boolean)
-      .join(" ; ");
-  },
-
-  scheduleRecalculate(reason = "unknown") {
-    if (this.recalcFrame) {
-      this.logDebug("recalc-coalesced", { reason });
-      return;
-    }
-    this.logDebug("recalc-scheduled", { reason });
+  scheduleRecalculate() {
+    if (this.recalcFrame) return;
     this.recalcFrame = requestAnimationFrame(() => {
       this.recalcFrame = 0;
-      this.logDebug("recalc-frame-fired", { reason });
       this.recalcularPosiciones();
     });
   },
 
-  clearBootstrapRetry() {
-    if (!Array.isArray(this.bootstrapRetryTimers)) {
-      this.bootstrapRetryTimers = [];
-      return;
-    }
-
-    this.bootstrapRetryTimers.forEach((timerId) => {
-      clearTimeout(timerId);
-    });
-    this.bootstrapRetryTimers = [];
-  },
-
-  scheduleBootstrapRetry({ delaysMs = [40, 120, 260, 520, 900, 1400] } = {}) {
-    this.clearBootstrapRetry();
-    if (!Array.isArray(this.issues) || this.issues.length === 0) return;
-
-    this.bootstrapRetryTimers = delaysMs.map((delayMs) =>
-      setTimeout(() => {
-        if (!this.issues?.length) return;
-        this.logDebug("bootstrap-retry-fired", { delayMs });
-        this.scheduleRecalculate(`bootstrap-${delayMs}`);
-      }, delayMs),
-    );
-  },
 
   scheduleReanalysis() {
     if (this.reanalysisTimer) clearTimeout(this.reanalysisTimer);
@@ -981,28 +861,14 @@ export const DocsHighlighter = {
     );
   },
 
-  logIssueRangeFallback(
-    source,
-    issue,
-    expectedStart,
-    expectedEnd,
-    resolvedRange,
-  ) {
-    this.logDebug("issue-range-fallback", {
+  logIssueRangeFallback(source, issue, expectedStart, expectedEnd, resolvedRange) {
+    console.log("[Legal Docs] Highlighter range fallback:", {
       source,
       issueId: issue?.id,
       regla: issue?.regla,
       texto: issue?.textoOriginal,
-      expectedRange: {
-        start: expectedStart,
-        end: expectedEnd,
-      },
-      chosenRange: resolvedRange
-        ? {
-            start: resolvedRange.start,
-            end: resolvedRange.end,
-          }
-        : null,
+      expectedRange: { start: expectedStart, end: expectedEnd },
+      chosenRange: resolvedRange ? { start: resolvedRange.start, end: resolvedRange.end } : null,
       matchType: resolvedRange?.matchType || "none",
     });
   },
@@ -1090,15 +956,6 @@ export const DocsHighlighter = {
   renderMarkers(issueRects) {
     this.currentRects = issueRects;
     this.syncIssuesWithRects(issueRects);
-    this.logDebug("render-markers", {
-      visibleIssues: this.countVisibleIssueRects(issueRects),
-      issueCount: this.issues.length,
-      markerGroups:
-        issueRects instanceof Map
-          ? Array.from(issueRects.values()).filter((rects) => rects?.length)
-              .length
-          : 0,
-    });
 
     this.issueMarkers.forEach((markers) => {
       markers.forEach((marker) => marker.remove());
@@ -1439,28 +1296,15 @@ export const DocsHighlighter = {
 
   requestCanvasFragments(timeout = 800) {
     return new Promise((resolve) => {
-      this.logDebug("canvas-fragments-requested", { timeout });
       let settled = false;
       let timeoutId;
       const finish = (detail) => {
         if (settled) return;
         settled = true;
-        document.removeEventListener(
-          "docs-reviewer-fragments-data",
-          eventHandler,
-        );
+        document.removeEventListener("docs-reviewer-fragments-data", eventHandler);
         window.removeEventListener("message", messageHandler);
         clearTimeout(timeoutId);
-        const safeDetail = Array.isArray(detail) ? detail : [];
-        const totalFragments = safeDetail.reduce(
-          (sum, canvasData) => sum + (canvasData.fragments?.length || 0),
-          0,
-        );
-        this.logDebug("canvas-fragments-received", {
-          canvases: safeDetail.length,
-          totalFragments,
-        });
-        resolve(safeDetail);
+        resolve(Array.isArray(detail) ? detail : []);
       };
       const eventHandler = (event) => finish(event.detail);
       const messageHandler = (event) => {
@@ -1470,17 +1314,7 @@ export const DocsHighlighter = {
       };
       document.addEventListener("docs-reviewer-fragments-data", eventHandler);
       window.addEventListener("message", messageHandler);
-      timeoutId = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        document.removeEventListener(
-          "docs-reviewer-fragments-data",
-          eventHandler,
-        );
-        window.removeEventListener("message", messageHandler);
-        this.logDebug("canvas-fragments-timeout", { timeout });
-        resolve([]);
-      }, timeout);
+      timeoutId = setTimeout(() => finish([]), timeout);
       document.dispatchEvent(new Event("docs-reviewer-request-fragments"));
     });
   },
@@ -1716,15 +1550,6 @@ export const DocsHighlighter = {
 
   mapIssuesToRectsFromCanvas(sortedFragments, canvasTextModel) {
     const issueRects = new Map();
-    const stats = {
-      issueCount: this.issues.length,
-      matchedByRange: 0,
-      matchedByFallback: 0,
-      visibleIssues: 0,
-      noTextMatch: 0,
-      noRectsAfterMatch: 0,
-      sampleMisses: [],
-    };
 
     for (const issue of this.issues) {
       let startIndex = issue.normalizedStart;
@@ -1732,8 +1557,6 @@ export const DocsHighlighter = {
       const normalizedNeedle = this.normalizeText(issue.textoOriginal);
       const exactNeedle = this.normalizeExactText(issue.textoOriginal);
       let rects = [];
-      let matchedByFallback = false;
-      let hadTextMatch = false;
 
       const needsTextFallback =
         startIndex === null ||
@@ -1755,8 +1578,6 @@ export const DocsHighlighter = {
         );
 
       if (!needsTextFallback) {
-        hadTextMatch = true;
-        stats.matchedByRange += 1;
         rects = this.computeRectsFromCanvasIndices(
           sortedFragments,
           canvasTextModel.charMap,
@@ -1773,9 +1594,6 @@ export const DocsHighlighter = {
         );
 
         if (fallbackMatch) {
-          hadTextMatch = true;
-          matchedByFallback = true;
-          stats.matchedByFallback += 1;
           this.logIssueRangeFallback(
             "canvas",
             issue,
@@ -1794,33 +1612,9 @@ export const DocsHighlighter = {
 
       issue.rects = rects;
       issue.isVisible = rects.length > 0;
-      if (rects.length > 0) {
-        stats.visibleIssues += 1;
-      } else if (!hadTextMatch) {
-        stats.noTextMatch += 1;
-        if (stats.sampleMisses.length < 5) {
-          stats.sampleMisses.push({
-            regla: issue.regla,
-            texto: issue.textoOriginal.slice(0, 80),
-            reason: "no-text-match",
-          });
-        }
-      } else {
-        stats.noRectsAfterMatch += 1;
-        if (stats.sampleMisses.length < 5) {
-          stats.sampleMisses.push({
-            regla: issue.regla,
-            texto: issue.textoOriginal.slice(0, 80),
-            reason: matchedByFallback
-              ? "fallback-match-without-rects"
-              : "range-match-without-rects",
-          });
-        }
-      }
       issueRects.set(issue.id, rects);
     }
 
-    this._lastCanvasMappingStats = stats;
     return issueRects;
   },
 
