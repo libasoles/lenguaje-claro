@@ -1,5 +1,7 @@
 # Lenguaje claro - Extensión Chrome para Google Docs
 
+![Captura de pantalla de la extensión](assets/screenshot.png)
+
 Una extensión de Chrome que se enfoca en reglas de escritura jurídica en el marco del lenguaje claro.
 
 Revisa y mejora la escritura en Google Docs, detectando problemas de estilo y sugiriendo mejoras. Es similar a Grammarly, ProWritingAid o Hemingway App pero pensada para profesionales del derecho.
@@ -10,14 +12,35 @@ No envía datos a servidores externos, ni usa modelos de IA. Funciona 100% en el
 
 ### Reglas de Escritura
 
-1. **Arcaísmos innecesarios** - Detecta y sugiere reemplazos para términos obsoletos
-   - Ejemplos: "in fine" → "al final", "a sensu contrario" → "en sentido contrario"
+1. **Arcaísmos innecesarios** - Detecta y sugiere reemplazos para términos obsoletos del lenguaje jurídico
+   - Ejemplos: "in fine" → "al final", "a sensu contrario" → "en sentido contrario", "otrosí digo" → "además solicito"
 
-2. **Voz pasiva** - Detecta construcciones pasivas y sugiere reestructurar en voz activa
-   - Ejemplo: "Fue interpuesto el recurso por..." → Sugerir voz activa
+2. **Tecnicismos** - Reemplaza términos técnicos legales por lenguaje llano y accesible
+   - Ejemplos: "prestatario" → "persona que recibe un préstamo", "mora" → "retraso", "enajenar" → "vender"
 
-3. **Queísmo** - Detecta cadenas de múltiples "que" en la misma oración
-   - Ayuda a simplificar oraciones complejas
+3. **Vaguedades** - Detecta expresiones imprecisas e indica qué tipo de información concreta debería reemplazarlas
+   - Ejemplos: "mucho" → cifra o porcentaje, "en alguna medida" → magnitud específica
+   - _Limitación_: no puede sugerir texto exacto porque la información precisa depende del contexto del documento
+
+4. **Rodeos innecesarios** - Sustituye frases extensas por alternativas concisas
+   - Ejemplos: "en el momento actual" → "ahora", "a fin de" → "para", "de conformidad con" → "según"
+
+5. **Voz pasiva** - Detecta construcciones pasivas y sugiere reestructurar en voz activa más directa
+   - Ejemplo: "fue interpuesto el recurso" → sugiere forma activa según el participio detectado
+   - _Limitación_: no siempre puede reconstruir la oración completa sin conocer el sujeto real; las sugerencias pueden requerir ajuste manual
+
+6. **Queísmo y dequeísmo** - Detecta el uso incorrecto u omisión de "de que" con patrones curados y contexto local
+   - Detecta queísmo ("me alegra que vengas" cuando corresponde "de que") y dequeísmo ("pienso de que" cuando corresponde "que")
+   - _Limitación_: algunos casos son ambiguos sin análisis sintáctico profundo; puede generar falsos positivos en oraciones complejas
+
+7. **Nominalización** - Detecta construcciones sustantivadas y sugiere usar el verbo directamente
+   - Ejemplos: "poner en consideración" → "considerar", "dar comienzo" → "comenzar", "realizar una inspección" → "inspeccionar"
+
+8. **Números** - Sugiere reemplazar números escritos con palabras por dígitos, y números romanos por arábigos
+   - Ejemplos: "treinta y dos" → "32", "Artículo XIV" → "Artículo 14"
+   - _Limitación_: omite "uno/una" en contextos ambiguos (artículo indeterminado vs. numeral) para evitar falsos positivos
+
+> **Nota sobre las limitaciones generales del análisis basado en regex:** al no usar servidores externos ni modelos de IA con NLP (procesamiento de lenguaje natural), todas las reglas operan con patrones de texto rígidos aplicados localmente en el navegador. Esto garantiza privacidad total pero implica que el sistema no comprende la estructura gramatical a fondo como un modelo de NLP, ni el significado de las oraciones. Como resultado, algunas sugerencias requieren revisión manual, ciertos casos ambiguos pueden generar falsos positivos, y reglas como voz pasiva o vaguedades no pueden reconstruir ni proponer el texto exacto sin conocer el contexto semántico del documento.
 
 ## Instalación y Uso
 
