@@ -4,7 +4,7 @@
   "name": "Lenguaje claro",
   "version": "0.1.1",
   "description": "Revisa y mejora la escritura en Google Docs - Detecta arcaísmos, voz pasiva y queísmo",
-  "permissions": ["storage", "identity"],
+  "permissions": ["identity"],
   "host_permissions": ["https://docs.googleapis.com/*"],
   "oauth2": {
     "client_id": "__CHROME_OAUTH_CLIENT_ID__",
