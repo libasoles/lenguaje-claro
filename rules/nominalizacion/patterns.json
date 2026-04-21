@@ -31,5 +31,79 @@
     "sugerencias": ["informar", "comunicar"]
   },
   { "original": "dar cumplimiento", "sugerencias": ["cumplir"] },
-  { "original": "proceder a efectuar", "sugerencias": ["efectuar", "hacer"] }
+  { "original": "proceder a efectuar", "sugerencias": ["efectuar", "hacer"] },
+  {
+    "original": "no siendo para más",
+    "sugerencias": ["no habiendo otros temas que tratar", "sin más asuntos"]
+  },
+  {
+    "original": "se da por finalizado el acto",
+    "sugerencias": ["se termina la reunión", "se finaliza el acto"]
+  },
+  {
+    "original": "firmando los comparecientes",
+    "sugerencias": ["firman los presentes", "firman los que asistieron"]
+  },
+  {
+    "original": "por ante mí",
+    "sugerencias": ["delante de mí", "ante mí"]
+  },
+  {
+    "original": "que doy fe",
+    "sugerencias": ["de lo cual certifico", "lo que confirmo"]
+  },
+  {
+    "original": "cuyas demás condiciones personales",
+    "sugerencias": ["sus otros datos personales"]
+  },
+  {
+    "original": "obran en la causa",
+    "sugerencias": ["están en el expediente", "ya figuran en el caso"]
+  },
+  {
+    "original": "por recibido",
+    "sugerencias": ["se recibe"]
+  },
+  {
+    "original": "agréguese",
+    "sugerencias": ["únase al expediente", "incorpórese"]
+  },
+  {
+    "original": "téngase presente",
+    "sugerencias": ["tómese nota", "téngase en cuenta"]
+  },
+  {
+    "original": "exhibe y retiene",
+    "sugerencias": ["muestra y se queda con el original"]
+  },
+  {
+    "original": "a estudio para resolver",
+    "sugerencias": [
+      "para ser analizado antes de la decisión",
+      "para dictar sentencia"
+    ]
+  },
+  {
+    "original": "en razón de ello",
+    "sugerencias": ["por eso", "por este motivo", "entonces"]
+  },
+  {
+    "original": "córrase vista",
+    "sugerencias": [
+      "avíseme a las partes para que revisen",
+      "comuníquese para que opinen"
+    ]
+  },
+  {
+    "original": "no se contempla el artículo",
+    "sugerencias": [
+      "el artículo no se aplica",
+      "el artículo no dice",
+      "no se incluye en el artículo"
+    ]
+  },
+  {
+    "original": "hágasele saber",
+    "sugerencias": ["infórmesele", "avísele", "notifíquese"]
+  }
 ]

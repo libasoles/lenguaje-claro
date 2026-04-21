@@ -64,5 +64,73 @@
     "sugerencias": ["el juez", "quien juzga"],
     "dropDeterminer": true
   },
-  { "original": "in limine", "sugerencias": ["sin más trámite", "de entrada"] }
+  { "original": "in limine", "sugerencias": ["sin más trámite", "de entrada"] },
+  [
+    { "original": "adujo", "sugerencias": ["dijo", "mencionó", "argumentó"] },
+    { "original": "avizora", "sugerencias": ["ve", "percibe", "prevé"] },
+    { "original": "comparecer", "sugerencias": ["presentarse", "asistir"] },
+    {
+      "original": "copia fiel",
+      "sugerencias": ["copia idéntica", "copia exacta"]
+    },
+    {
+      "original": "desglose",
+      "sugerencias": ["separación de documentos", "sacar hojas del expediente"]
+    },
+    {
+      "original": "desinsacular",
+      "sugerencias": ["sortear", "sacar de la urna"]
+    },
+    {
+      "original": "emplazado",
+      "sugerencias": ["notificado", "citado"],
+      "dropDeterminer": true
+    },
+    {
+      "original": "encartado",
+      "sugerencias": ["acusado", "imputado"],
+      "dropDeterminer": true
+    },
+    { "original": "endilgado", "sugerencias": ["atribuido", "acusado"] },
+    {
+      "original": "estado de autos",
+      "sugerencias": ["estado del expediente", "situación del caso"]
+    },
+    { "original": "fallo", "sugerencias": ["sentencia", "decisión del juez"] },
+    {
+      "original": "firme",
+      "sugerencias": ["definitivo", "que ya no se puede apelar"]
+    },
+    { "original": "firmeza", "sugerencias": ["carácter definitivo"] },
+    { "original": "foja", "sugerencias": ["hoja", "página"] },
+    { "original": "foliatura", "sugerencias": ["numeración de las páginas"] },
+    { "original": "génesis", "sugerencias": ["origen", "inicio", "comienzo"] },
+    { "original": "palmaria", "sugerencias": ["clara", "evidente", "obvia"] },
+    {
+      "original": "pesquisa",
+      "sugerencias": ["investigación", "averiguación"]
+    },
+    {
+      "original": "precitado",
+      "sugerencias": ["ya mencionado", "antes citado"]
+    },
+    { "original": "prístino", "sugerencias": ["puro", "original", "claro"] },
+    {
+      "original": "proveído",
+      "sugerencias": ["resolución", "decisión", "orden del juez"]
+    },
+    { "original": "recabar", "sugerencias": ["reunir", "juntar", "obtener"] },
+    {
+      "original": "resulta",
+      "sugerencias": ["surge", "se desprende", "aparece"]
+    },
+    {
+      "original": "subrogar",
+      "sugerencias": ["reemplazar", "sustituir a alguien en sus derechos"]
+    },
+    {
+      "original": "zanjado",
+      "sugerencias": ["resuelto", "solucionado", "terminado"]
+    }
+  ]
 ]
