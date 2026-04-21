@@ -546,7 +546,7 @@ export const DocsPanel = {
         this._flashTimer = setTimeout(() => {
           issueElement.classList.remove("docs-reviewer-issue-flash");
           this._flashTimer = null;
-        }, 3000);
+        }, 2000);
       }
     }
   },
