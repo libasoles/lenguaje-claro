@@ -251,13 +251,17 @@ export const highlighterPopupMethods = {
     `;
   },
 
+  _cerrarPopup(issueId) {
+    this.pinnedIssueId = null;
+    this.limpiarAnclaPopup(issueId);
+    obtenerAccionesReviewer().limpiarIssueActivo();
+  },
+
   enlazarAccionesPopup(issue) {
     this.popupElement
       .querySelector(".docs-reviewer-popup-close")
       ?.addEventListener("click", () => {
-        this.pinnedIssueId = null;
-        this.limpiarAnclaPopup(issue.id);
-        obtenerAccionesReviewer().limpiarIssueActivo();
+        this._cerrarPopup(issue.id);
       });
 
     this.popupElement
@@ -281,6 +285,8 @@ export const highlighterPopupMethods = {
           desplazarPanelAlInicio: true,
           destacar: true,
         });
+
+        this._cerrarPopup(issue.id);
       });
   },
 
