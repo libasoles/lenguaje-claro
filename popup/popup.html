@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@400;500;600&family=Fraunces:ital,wght@0,400;0,500;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="popup-header">
+      <div class="popup-header__media">
+        <img class="popup-header__banner" src="../assets/banner.png" alt="" />
+        <span class="popup-header__badge">Beta</span>
+      </div>
+      <h1>Extensión Lenguaje Claro</h1>
+    </header>
+
+    <section class="popup-body">
+      <label class="popup-row">
+        <div class="popup-row__text">
+          <span class="popup-row__title">En todos los documentos</span>
+        </div>
+        <input type="checkbox" id="toggle-global" />
+      </label>
+
+      <label class="popup-row" id="row-doc">
+        <div class="popup-row__text">
+          <span class="popup-row__title">En este documento</span>
+          <span class="popup-row__subtitle" id="doc-subtitle">—</span>
+        </div>
+        <input type="checkbox" id="toggle-doc" />
+      </label>
+    </section>
+
+    <footer class="popup-footer" id="reload-hint" hidden>
+      Recargá la pestaña para aplicar los cambios.
+    </footer>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

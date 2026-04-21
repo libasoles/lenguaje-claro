@@ -1,0 +1,68 @@
+[
+  {
+    "original": "prestatario",
+    "sugerencias": ["persona que recibe un préstamo"]
+  },
+  { "original": "expiración", "sugerencias": ["vencimiento"] },
+  { "original": "mora", "sugerencias": ["retraso", "aplazamiento"] },
+  { "original": "enajenar", "sugerencias": ["vender", "transmitir"] },
+  { "original": "enajenación", "sugerencias": ["venta", "transmisión"] },
+  { "original": "empero", "sugerencias": ["sin embargo"] },
+  { "original": "dilación", "sugerencias": ["demora"] },
+  { "original": "per cápita", "sugerencias": ["por persona"] },
+  {
+    "original": "cláusula penal",
+    "sugerencias": ["penalidad por incumplimiento"]
+  },
+  {
+    "original": "acreedor",
+    "sugerencias": ["quien presta el dinero", "quien tiene el derecho a cobrar"]
+  },
+  {
+    "original": "deudor",
+    "sugerencias": [
+      "quien debe el dinero",
+      "quien tiene la obligación de pagar"
+    ]
+  },
+  { "original": "rescisión", "sugerencias": ["cancelación", "terminación"] },
+  { "original": "resolución", "sugerencias": ["cancelación", "terminación"] },
+  { "original": "suscribir", "sugerencias": ["firmar"] },
+  { "original": "suscripto", "sugerencias": ["firmado"] },
+  { "original": "fojas", "sugerencias": ["páginas", "hojas"] },
+  { "original": "notificar", "sugerencias": ["avisar", "comunicar"] },
+  {
+    "original": "arbitrar los medios",
+    "sugerencias": ["hacer lo necesario", "gestionar"]
+  },
+  { "original": "erogación", "sugerencias": ["gasto", "pago"] },
+  {
+    "original": "fehacientemente",
+    "sugerencias": ["de forma comprobable", "formalmente"]
+  },
+  { "original": "autógrafa", "sugerencias": ["firma de puño y letra"] },
+  { "original": "estipulaciones", "sugerencias": ["condiciones", "términos"] },
+  { "original": "estipulación", "sugerencias": ["condición", "término"] },
+  { "original": "estipular", "sugerencias": ["acordar", "establecer"] },
+  {
+    "original": "actor",
+    "sugerencias": ["quien demanda", "la parte demandante"],
+    "dropDeterminer": true
+  },
+  {
+    "original": "actora",
+    "sugerencias": ["quien demanda", "la parte demandante"],
+    "dropDeterminer": true
+  },
+  {
+    "original": "accionante",
+    "sugerencias": ["quien inició el juicio", "quien demanda"],
+    "dropDeterminer": true
+  },
+  {
+    "original": "juzgador",
+    "sugerencias": ["el juez", "quien juzga"],
+    "dropDeterminer": true
+  },
+  { "original": "in limine", "sugerencias": ["sin más trámite", "de entrada"] }
+]

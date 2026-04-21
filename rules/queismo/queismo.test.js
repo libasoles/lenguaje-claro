@@ -1,0 +1,127 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { loadBrowserModule } = require("../../tests/helpers/load-browser-module.js");
+
+const projectRoot = path.resolve(__dirname, "..", "..");
+const patterns = JSON.parse(
+  fs.readFileSync(path.join(projectRoot, "rules", "queismo", "patterns.json"), "utf8"),
+);
+
+function getPatternEntry(group, id) {
+  const entry = patterns[group].find((item) => item.id === id);
+  assert.ok(entry, `No se encontro el patron ${group}:${id}`);
+  return entry;
+}
+
+function loadQueismoRule() {
+  const { exports } = loadBrowserModule({
+    projectRoot,
+    filename: "tests/queismo-entry.js",
+    source: `export { queismoRule } from "./rules/queismo/rule.js";`,
+    sandbox: {
+      console,
+      window: {},
+      chrome: {
+        runtime: {
+          getURL(resourcePath) {
+            return `chrome-extension://test/${resourcePath}`;
+          },
+        },
+      },
+      XMLHttpRequest: function XMLHttpRequest() {},
+    },
+  });
+
+  const rule = exports.queismoRule;
+  assert.ok(rule, "No se pudo cargar la regla de queismo");
+  rule._patterns = patterns;
+  rule.getPatterns = () => patterns;
+  rule.getNlpEngine = () => null;
+  rule._engineName = "fallback";
+  return rule;
+}
+
+function assertRegexBehavior(entry, { matches = [], misses = [] }) {
+  const regex = new RegExp(entry.triggerPattern, "gi");
+
+  matches.forEach((sample) => {
+    regex.lastIndex = 0;
+    assert.equal(regex.test(sample), true, `Debia detectar: ${sample}`);
+  });
+
+  misses.forEach((sample) => {
+    regex.lastIndex = 0;
+    assert.equal(regex.test(sample), false, `No debia detectar: ${sample}`);
+  });
+}
+
+test("todos los patrones curados compilan", () => {
+  [
+    ...patterns.requiere_de_que,
+    ...patterns.nunca_de_que,
+  ].forEach((entry) => {
+    assert.doesNotThrow(() => new RegExp(entry.triggerPattern, "gi"), entry.id);
+    assert.doesNotThrow(() => new RegExp(entry.suggestedPattern, "gi"), entry.id);
+    assert.equal(
+      Object.hasOwn(entry, "sugerencia"),
+      false,
+      `${entry.id} no debe definir sugerencia singular`,
+    );
+    assert.equal(
+      Object.hasOwn(entry, "sugerencias"),
+      false,
+      `${entry.id} no debe definir sugerencias; queismo las genera desde el match`,
+    );
+  });
+});
+
+test("matcher de darse cuenta cubre las frases reportadas", () => {
+  const entry = getPatternEntry("requiere_de_que", "darse-cuenta");
+  assertRegexBehavior(entry, {
+    matches: [
+      "Hay que darse cuenta que esto importa.",
+      "Me da cuenta que no alcanza.",
+    ],
+    misses: [
+      "Hay que darse cuenta de que esto importa.",
+      "Hay que darse cuenta, si acaso, de lo ocurrido.",
+    ],
+  });
+});
+
+test("matcher de olvidarse detecta la forma sin de", () => {
+  const entry = getPatternEntry("requiere_de_que", "olvidarse");
+  assertRegexBehavior(entry, {
+    matches: [
+      "Es facil olvidarse que hay plazo.",
+      "Se olvida que el termino vence hoy.",
+    ],
+    misses: [
+      "Es facil olvidarse de que hay plazo.",
+      "Se olvida de que el termino vence hoy.",
+    ],
+  });
+});
+
+test("matcher de dequeismo sigue detectando afirmar de que", () => {
+  const entry = getPatternEntry("nunca_de_que", "afirmar");
+  assertRegexBehavior(entry, {
+    matches: ["La parte afirma de que hubo un error."],
+    misses: ["La parte afirma que hubo un error."],
+  });
+});
+
+test("la regla completa respeta exclusiones y devuelve hallazgos", () => {
+  const rule = loadQueismoRule();
+  const findings = rule.detectar(
+    "Hay que darse cuenta que esto importa. La parte afirma de que hubo un error. Hay que darse cuenta que si no apelan, precluye.",
+  );
+  const hallazgoTipos = Array.from(findings, (item) => item.tipoHallazgo);
+
+  assert.equal(findings.length, 2);
+  assert.deepEqual(hallazgoTipos, ["queismo", "dequeismo"]);
+  assert.equal(findings[0].textoOriginal, "darse cuenta que");
+  assert.equal(findings[1].textoOriginal, "afirma de que");
+});

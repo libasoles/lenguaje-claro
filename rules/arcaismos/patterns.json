@@ -1,0 +1,35 @@
+[
+  { "original": "in fine", "sugerencias": ["al final"] },
+  { "original": "a sensu contrario", "sugerencias": ["en sentido contrario"] },
+  { "original": "viene en decidir", "sugerencias": ["se decide"] },
+  { "original": "otrosí digo", "sugerencias": ["además solicito"] },
+  { "original": "susodicho", "sugerencias": ["mencionado"] },
+  { "original": "infraescrito", "sugerencias": ["quien firma"] },
+  { "original": "fehaciente", "sugerencias": ["comprobable"] },
+  { "original": "incoar", "sugerencias": ["iniciar"] },
+  { "original": "adverar", "sugerencias": ["acreditar"] },
+  { "original": "dirimir", "sugerencias": ["resolver"] },
+  { "original": "decaer en su derecho", "sugerencias": ["perder su derecho"] },
+  { "original": "sírvase proveer", "sugerencias": ["disponga"] },
+  { "original": "tenor literal", "sugerencias": ["texto literal"] },
+  {
+    "original": "tengo el agrado de dirigirme",
+    "sugerencias": ["le escribo para"]
+  },
+  { "original": "obra en mi poder", "sugerencias": ["tengo"] },
+  {
+    "original": "elevar una consulta",
+    "sugerencias": ["consultar", "preguntar"]
+  },
+  { "original": "in situ", "sugerencias": ["en el lugar"] },
+  { "original": "in-situ", "sugerencias": ["en el lugar"] },
+  { "original": "fágase", "sugerencias": ["hágase", "se aprueba"] },
+  {
+    "original": "habida cuenta que",
+    "sugerencias": ["porque", "ya que", "dado que"]
+  },
+  {
+    "original": "habida cuenta de que",
+    "sugerencias": ["porque", "ya que", "dado que"]
+  }
+]

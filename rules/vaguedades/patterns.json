@@ -1,0 +1,46 @@
+[
+  { "original": "mucho", "precision": "Cifra o porcentaje (ej: 90%)" },
+  { "original": "mucha", "precision": "Cifra o porcentaje (ej: 90%)" },
+  { "original": "muchos", "precision": "Cifra o porcentaje (ej: 90%)" },
+  { "original": "muchas", "precision": "Cifra o porcentaje (ej: 90%)" },
+  {
+    "original": "maravilloso",
+    "precision": "Cifra o porcentaje de satisfacción (ej: 85%)"
+  },
+  {
+    "original": "maravillosa",
+    "precision": "Cifra o porcentaje de satisfacción (ej: 85%)"
+  },
+  {
+    "original": "en alguna medida",
+    "precision": "Cifra de proporción numérica (ej: uno de cada tres)"
+  },
+  {
+    "original": "razonable",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "suficiente",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "suficientes",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "considerable",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "considerables",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "oportuno",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  },
+  {
+    "original": "oportuna",
+    "precision": "Cifra que sustente la afirmación (ej: un computador por cada tres estudiantes)"
+  }
+]

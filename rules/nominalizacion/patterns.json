@@ -1,0 +1,35 @@
+[
+  { "original": "poner en consideración", "sugerencias": ["considerar"] },
+  { "original": "dar comienzo", "sugerencias": ["comenzar", "empezar"] },
+  { "original": "llegar a la conclusión", "sugerencias": ["concluir"] },
+  {
+    "original": "poner de manifiesto",
+    "sugerencias": ["manifestar", "decir", "exponer"]
+  },
+  { "original": "mantuvieron una reunión", "sugerencias": ["se reunieron"] },
+  { "original": "proceder a la entrega", "sugerencias": ["entregar"] },
+  { "original": "realizar una inspección", "sugerencias": ["inspeccionar"] },
+  { "original": "efectuar la presentación", "sugerencias": ["presentar"] },
+  { "original": "proceder a la presentación", "sugerencias": ["presentar"] },
+  { "original": "proceder a la interposición", "sugerencias": ["interponer"] },
+  { "original": "interponer recurso de apelación", "sugerencias": ["apelar"] },
+  {
+    "original": "interponer recurso de queja",
+    "sugerencias": ["quejarse", "impugnar"]
+  },
+  {
+    "original": "interponer recurso de casación",
+    "sugerencias": ["recurrir en casación"]
+  },
+  { "original": "tener en consideración", "sugerencias": ["considerar"] },
+  { "original": "tomar en consideración", "sugerencias": ["considerar"] },
+  { "original": "hacer entrega", "sugerencias": ["entregar"] },
+  { "original": "dar aviso", "sugerencias": ["avisar", "notificar"] },
+  { "original": "llevar a cabo", "sugerencias": ["realizar", "hacer"] },
+  {
+    "original": "poner en conocimiento",
+    "sugerencias": ["informar", "comunicar"]
+  },
+  { "original": "dar cumplimiento", "sugerencias": ["cumplir"] },
+  { "original": "proceder a efectuar", "sugerencias": ["efectuar", "hacer"] }
+]

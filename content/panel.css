@@ -1,0 +1,544 @@
+/* Panel principal */
+.docs-reviewer-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 360px;
+  height: 100%;
+  background: var(--bg, oklch(0.985 0.008 75));
+  border-left: 1px solid #e0e0e0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, sans-serif;
+}
+
+/* Header del panel */
+.docs-reviewer-header {
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg, oklch(0.985 0.008 75));
+}
+
+.docs-reviewer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.docs-reviewer-logo {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.docs-reviewer-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Error de autenticación */
+.docs-reviewer-auth-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px 24px;
+}
+
+.docs-reviewer-auth-button {
+  background: var(--accent, #b86b4b);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.18s;
+}
+
+.docs-reviewer-auth-button:hover {
+  background: color-mix(in oklch, var(--accent, #b86b4b), #000 12%);
+}
+
+/* Botón de cerrar */
+.docs-reviewer-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.docs-reviewer-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+/* Grupo de botones del header */
+.docs-reviewer-header-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Botón de re-analizar */
+
+.docs-reviewer-reanalyze {
+  background: var(--accent-soft, #f5e7e0);
+  border: 1px solid var(--accent, #b86b4b);
+  cursor: pointer;
+  color: var(--accent, #b86b4b);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(184, 107, 75, 0.08);
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.docs-reviewer-reanalyze:hover {
+  background: color-mix(
+    in oklch,
+    var(--accent-soft, #f5e7e0),
+    var(--accent, #b86b4b) 18%
+  );
+  border-color: var(--accent, #b86b4b);
+  color: color-mix(in oklch, var(--accent, #b86b4b), #000 18%);
+  box-shadow: 0 2px 6px rgba(184, 107, 75, 0.18);
+}
+
+.docs-reviewer-reanalyze:active {
+  transform: scale(0.96);
+}
+
+.docs-reviewer-reanalyze:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.docs-reviewer-reanalyze-icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.18s ease;
+}
+
+.docs-reviewer-reanalyze:hover .docs-reviewer-reanalyze-icon {
+  transform: rotate(36deg);
+}
+
+.docs-reviewer-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Mensaje de error */
+.docs-reviewer-error {
+  color: #c0392b !important;
+}
+
+/* Contenido del panel */
+.docs-reviewer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.docs-reviewer-issues {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Sort toolbar */
+.docs-reviewer-sort-toolbar {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+  padding: 6px 12px;
+  border-bottom: 1px solid #e8ecf0;
+  background: var(--bg, oklch(0.985 0.008 75));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.docs-reviewer-sort-btn {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #888;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.docs-reviewer-sort-btn:hover {
+  background: #f0f0f0;
+  color: #444;
+}
+
+.docs-reviewer-sort-btn--active {
+  color: var(--accent, #b86b4b);
+  font-weight: 600;
+  background: var(--accent-soft, #f5e7e0);
+}
+
+/* Section title (grouped mode) */
+.docs-reviewer-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #555;
+  padding: 14px 16px 6px;
+  margin-top: 0;
+  position: sticky;
+  top: 35px;
+  z-index: 1;
+  background: var(--bg, oklch(0.985 0.008 75));
+}
+
+.docs-reviewer-section-title::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.docs-reviewer-section-title::before {
+  background: var(--docs-reviewer-rule-color, #999);
+}
+
+/* Issue section container — space between cards */
+.docs-reviewer-issue-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.docs-reviewer-issue-section .docs-reviewer-issue {
+  border-bottom: none;
+  border-radius: 6px;
+  border: 1px solid #eaecf0;
+}
+
+/* Loading skeleton */
+.docs-reviewer-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+
+.docs-reviewer-skeleton-card {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docs-reviewer-skeleton {
+  background: #e8ecf0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ececec 25%, #f5f5f5 50%, #ececec 75%);
+  background-size: 200% 100%;
+  animation: docs-reviewer-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes docs-reviewer-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.docs-reviewer-skeleton-badge {
+  width: 72px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.docs-reviewer-skeleton-line {
+  height: 13px;
+  border-radius: 3px;
+}
+
+.docs-reviewer-skeleton-line--suggestion {
+  background: linear-gradient(
+    90deg,
+    var(--accent-soft, oklch(0.92 0.035 45)) 25%,
+    color-mix(
+        in oklch,
+        var(--accent-soft, oklch(0.92 0.035 45)),
+        var(--accent, oklch(0.58 0.135 40)) 22%
+      )
+      50%,
+    var(--accent-soft, oklch(0.92 0.035 45)) 75%
+  );
+  background-size: 200% 100%;
+  animation: docs-reviewer-shimmer 1.4s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+.docs-reviewer-skeleton-btn {
+  width: 100px;
+  height: 28px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.docs-reviewer-placeholder {
+  margin: 16px;
+  padding: 18px 16px;
+  text-align: center;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+}
+
+.docs-reviewer-placeholder-success {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.docs-reviewer-placeholder.docs-reviewer-error {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+/* Cada item de issue */
+.docs-reviewer-issue {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.docs-reviewer-issue:hover {
+  background: #f5e7e0;
+}
+
+.docs-reviewer-issue-active {
+  background: var(--accent-soft, #f5e7e0);
+  box-shadow: inset 3px 0 0 var(--accent, #b86b4b);
+}
+
+.docs-reviewer-issue-flash {
+  animation: docs-reviewer-issue-flash 2s ease-out;
+}
+
+@keyframes docs-reviewer-issue-flash {
+  0% {
+    background: #e3f0fa;
+    box-shadow:
+      inset 3px 0 0 #196ea9,
+      0 0 0 2px #196ea9;
+  }
+  70% {
+    background: #f0f6fa;
+    box-shadow:
+      inset 3px 0 0 #196ea9,
+      0 0 0 2px transparent;
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+.docs-reviewer-issue-regla {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.docs-reviewer-issue-regla::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.docs-reviewer-issue-regla::before {
+  background: var(--docs-reviewer-rule-color, #999);
+}
+
+.docs-reviewer-issue-color {
+  color: #666;
+  flex: 1;
+}
+
+.docs-reviewer-issue-counter {
+  margin-left: auto;
+  font-size: 11px;
+  color: #999;
+  font-weight: 400;
+}
+
+.docs-reviewer-issue-texto {
+  font-size: 13px;
+  color: #333;
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+.docs-reviewer-issue-original {
+  padding: 8px;
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  margin-bottom: 8px;
+
+  background: var(--ochre-soft, #f8f3e7);
+  color: var(--ink, #4d3a2a);
+  border-left: 3px solid var(--ochre, #e2b97f);
+}
+
+.docs-reviewer-inline-mark {
+  text-decoration: underline wavy;
+  text-underline-offset: 3px;
+}
+
+.docs-reviewer-inline-mark {
+  text-decoration-color: var(--docs-reviewer-rule-color, #999);
+}
+
+.docs-reviewer-issue-sugerencia {
+  padding: 8px;
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  margin-bottom: 8px;
+  background: var(--accent-soft, oklch(0.92 0.035 45));
+  color: var(--accent-ink, oklch(0.32 0.1 40));
+  border-left: 2px solid var(--accent, oklch(0.58 0.135 40));
+}
+
+.docs-reviewer-issue-hint {
+  background: #ede7f6;
+  padding: 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #4a235a;
+  margin-bottom: 8px;
+  border-left: 2px solid #8e44ad;
+}
+
+.docs-reviewer-issue-descripcion {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.docs-reviewer-issue-button {
+  background: var(--accent, #b86b4b);
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s;
+  width: 100%;
+}
+
+.docs-reviewer-issue-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.docs-reviewer-issue-button-group .docs-reviewer-issue-button {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+.docs-reviewer-issue-button:hover {
+  background: color-mix(in oklch, var(--accent, #b86b4b), #000 12%);
+}
+
+.docs-reviewer-issue-button:active {
+  background: color-mix(in oklch, var(--accent, #b86b4b), #000 22%);
+}
+
+/* Scrollbar personalizado */
+.docs-reviewer-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+.docs-reviewer-content::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}

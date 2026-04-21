@@ -1,0 +1,62 @@
+[
+  { "original": "en el momento actual", "sugerencias": ["ahora"] },
+  { "original": "en vista de que", "sugerencias": ["por"] },
+  { "original": "dado el hecho de que", "sugerencias": ["porque"] },
+  { "original": "con motivo de", "sugerencias": ["porque"] },
+  { "original": "como efecto de", "sugerencias": ["porque"] },
+  { "original": "a fin de", "sugerencias": ["para"] },
+  { "original": "con el objeto de", "sugerencias": ["para"] },
+  { "original": "para el propósito de", "sugerencias": ["para"] },
+  { "original": "con la finalidad de", "sugerencias": ["para"] },
+  { "original": "en el entendido de", "sugerencias": ["porque", "ya que"] },
+  { "original": "toda vez que", "sugerencias": ["porque", "ya que"] },
+  { "original": "debido a que", "sugerencias": ["porque"] },
+  {
+    "original": "no obstante el hecho de que",
+    "sugerencias": ["aunque", "a pesar de que"]
+  },
+  { "original": "de conformidad con", "sugerencias": ["según", "bajo"] },
+  { "original": "a considerable distancia", "sugerencias": ["lejos"] },
+  {
+    "original": "en virtud de lo expuesto",
+    "sugerencias": ["por lo expuesto", "por eso"]
+  },
+  {
+    "original": "en virtud de lo anteriormente expuesto",
+    "sugerencias": ["por lo expuesto", "por eso"]
+  },
+  {
+    "original": "vengo por el presente a",
+    "sugerencias": ["por este escrito"]
+  },
+  { "original": "por el presente", "sugerencias": ["por este escrito"] },
+  { "original": "de fecha", "sugerencias": ["del", "fechado el"] },
+  { "original": "con posterioridad", "sugerencias": ["después", "luego"] },
+  { "original": "con anterioridad", "sugerencias": ["antes"] },
+  {
+    "original": "motivo por el cual",
+    "sugerencias": ["por eso", "por lo que"]
+  },
+  { "original": "en el día de la fecha", "sugerencias": ["hoy"] },
+  {
+    "original": "a la brevedad posible",
+    "sugerencias": ["pronto", "cuanto antes"]
+  },
+  { "original": "en el marco de", "sugerencias": ["en", "dentro de"] },
+  { "original": "a los efectos de", "sugerencias": ["para"] },
+  { "original": "a efectos de", "sugerencias": ["para"] },
+  { "original": "en razón de", "sugerencias": ["por", "debido a"] },
+  {
+    "original": "en lo que respecta a",
+    "sugerencias": ["sobre", "en cuanto a"]
+  },
+  { "original": "a partir de este momento", "sugerencias": ["desde ahora"] },
+  {
+    "original": "sin que se tuviera en consideración",
+    "sugerencias": ["sin considerar"]
+  },
+  {
+    "original": "sin tener en consideración",
+    "sugerencias": ["sin considerar"]
+  }
+]

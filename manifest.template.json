@@ -1,0 +1,60 @@
+{
+  "_comment": "Edita aqui y luego corre `npm run build` para generar `dist/manifest.json` con el client ID tomado de .env.",
+  "manifest_version": 3,
+  "name": "Lenguaje claro",
+  "version": "0.1.5",
+  "description": "Revisa textos jurídicos en Google Docs y sugiere mejoras de lenguaje claro, sin enviar tu contenido a servidores externos.",
+  "permissions": ["identity", "storage", "activeTab"],
+  "host_permissions": ["https://docs.googleapis.com/*"],
+  "oauth2": {
+    "client_id": "__CHROME_OAUTH_CLIENT_ID__",
+    "scopes": ["https://www.googleapis.com/auth/documents"]
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Lenguaje claro",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/icons/*",
+        "rules/queismo/patterns.json",
+        "content/panel.css",
+        "content/highlighter-modules/marker-popup.css"
+      ],
+      "matches": ["https://docs.google.com/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/*"],
+      "js": ["content/canvas-interceptors.js", "content/kix-bridge.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://docs.google.com/*"],
+      "js": [
+        "vendor/compromise.min.js",
+        "vendor/es-compromise.min.js",
+        "content/index.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
