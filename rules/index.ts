@@ -1,4 +1,5 @@
 import arcaismosRule from "./arcaismos/rule.js";
+import titulosHonorificosRule from "./titulos-honorificos/rule.js";
 import tecnicismosRule from "./tecnicismos/rule.js";
 import vaguedadesRule from "./vaguedades/rule.js";
 import rodeosRule from "./rodeos/rule.js";
@@ -18,11 +19,13 @@ export type {
   QueismoPattern as QueismoPatternEntry,
   QueismoPatterns,
   Rule,
+  TituloHonorificoPattern,
   VaguedadPattern,
 } from "./types.js";
 
 export const rules: Rule[] = [
   arcaismosRule,
+  titulosHonorificosRule,
   tecnicismosRule,
   vaguedadesRule,
   rodeosRule,

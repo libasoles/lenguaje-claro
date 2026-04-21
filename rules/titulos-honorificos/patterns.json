@@ -1,0 +1,107 @@
+[
+  { "original": "honorable tribunal", "sugerencias": ["tribunal"] },
+  { "original": "honorable cámara", "sugerencias": ["cámara"] },
+  { "original": "honorable corte", "sugerencias": ["corte"] },
+  { "original": "honorable juzgado", "sugerencias": ["juzgado"] },
+  { "original": "h. tribunal", "sugerencias": ["tribunal"] },
+  { "original": "h. cámara", "sugerencias": ["cámara"] },
+  { "original": "h. corte", "sugerencias": ["corte"] },
+  { "original": "h. juzgado", "sugerencias": ["juzgado"] },
+  { "original": "excma. cámara", "sugerencias": ["cámara"] },
+  { "original": "excmo. tribunal", "sugerencias": ["tribunal"] },
+  { "original": "excelentísima corte", "sugerencias": ["corte"] },
+  { "original": "excelentísimo tribunal", "sugerencias": ["tribunal"] },
+  { "original": "ilustrísima cámara", "sugerencias": ["cámara"] },
+  { "original": "ilustrísimo tribunal", "sugerencias": ["tribunal"] },
+  { "original": "ilustre tribunal", "sugerencias": ["tribunal"] },
+  { "original": "señor juez", "sugerencias": ["juez"] },
+  { "original": "señora jueza", "sugerencias": ["jueza"] },
+  { "original": "señores jueces", "sugerencias": ["jueces"] },
+  { "original": "señoras juezas", "sugerencias": ["juezas"] },
+  { "original": "distinguido magistrado", "sugerencias": ["magistrado"] },
+  { "original": "distinguida magistrada", "sugerencias": ["magistrada"] },
+  { "original": "distinguido tribunal", "sugerencias": ["tribunal"] },
+  { "original": "distinguida cámara", "sugerencias": ["cámara"] },
+  {
+    "original": "excma./excmo.",
+    "regex": "exc(?:ma|mo|mas|mos)\\.?",
+    "advertencia": "Evitá tratamientos honoríficos como \"Excma.\" o \"Excmo.\". Usá el nombre del órgano o cargo sin ese tratamiento."
+  },
+  {
+    "original": "excelentísima/excelentísimo",
+    "regex": "excelent[ií]sim(?:a|o|as|os)",
+    "advertencia": "Evitá tratamientos cuasi-nobiliarios como \"excelentísima\" o \"excelentísimo\". Usá el cargo o institución de forma directa."
+  },
+  {
+    "original": "ilma./ilmo.",
+    "regex": "il(?:ma|mo|mas|mos)\\.?",
+    "advertencia": "Evitá abreviaturas honoríficas como \"Ilma.\" o \"Ilmo.\". Usá el cargo o institución sin tratamiento ceremonial."
+  },
+  {
+    "original": "ilustrísima/ilustrísimo",
+    "regex": "ilustr[ií]sim(?:a|o|as|os)",
+    "advertencia": "Evitá tratamientos como \"ilustrísima\" o \"ilustrísimo\". Nombrá directamente el cargo o el órgano."
+  },
+  {
+    "original": "honorable",
+    "advertencia": "Evitá usar \"honorable\" como tratamiento institucional. Si hace falta, nombrá el órgano directamente."
+  },
+  {
+    "original": "distinguido",
+    "regex": "distinguid(?:a|o|as|os)",
+    "advertencia": "Evitá adjetivos honoríficos como \"distinguido\" o \"distinguida\". Omitilos o usá una identificación neutral."
+  },
+  {
+    "original": "su señoría",
+    "advertencia": "Evitá fórmulas como \"Su Señoría\". Si hace falta, usá \"el juzgado\", \"el tribunal\" o el cargo concreto."
+  },
+  {
+    "original": "vuestra señoría",
+    "regex": "v(?:uestra|ra)\\.?\\s*s(?:eñoría|ría|a)\\.?",
+    "sugerencias": ["usted", "el juzgado", "el tribunal"],
+    "advertencia": "Evitá fórmulas como \"Vuestra Señoría\". Si hace falta, usá \"el juzgado\", \"el tribunal\" o el cargo concreto."
+  },
+  {
+    "original": "señoría",
+    "advertencia": "Evitá \"señoría\" como tratamiento honorífico. Usá el cargo, el órgano o el nombre de la persona."
+  },
+  {
+    "original": "v.s.",
+    "regex": "v\\.\\s*s\\.(?:\\s*i\\.)?",
+    "advertencia": "Evitá abreviaturas de tratamiento como \"V.S.\" o \"V.S.I.\". Usá el cargo o el órgano de forma directa."
+  },
+  {
+    "original": "s.s.",
+    "regex": "s\\.\\s*s\\.?",
+    "advertencia": "Evitá abreviaturas de tratamiento como \"S.S.\". Usá el cargo o el órgano de forma directa."
+  },
+  {
+    "original": "v.e.",
+    "regex": "v\\.\\s*e\\.",
+    "advertencia": "Evitá abreviaturas de tratamiento como \"V.E.\". Usá el cargo o la institución de forma directa."
+  },
+  {
+    "original": "su excelencia",
+    "advertencia": "Evitá fórmulas como \"Su Excelencia\". Usá el cargo o la institución de forma directa."
+  },
+  {
+    "original": "vuestra excelencia",
+    "advertencia": "Evitá fórmulas como \"Vuestra Excelencia\". Usá el cargo o la institución de forma directa."
+  },
+  {
+    "original": "digno tribunal",
+    "sugerencias": ["tribunal"]
+  },
+  {
+    "original": "digna cámara",
+    "sugerencias": ["cámara"]
+  },
+  {
+    "original": "digno magistrado",
+    "sugerencias": ["magistrado"]
+  },
+  {
+    "original": "digna magistrada",
+    "sugerencias": ["magistrada"]
+  }
+]

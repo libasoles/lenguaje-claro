@@ -7,6 +7,10 @@ const projectRoot = path.resolve(__dirname, "..");
 
 const RULES = [
   { name: "arcaismosRule", file: "./rules/arcaismos/rule.js" },
+  {
+    name: "titulosHonorificosRule",
+    file: "./rules/titulos-honorificos/rule.js",
+  },
   { name: "tecnicismosRule", file: "./rules/tecnicismos/rule.js" },
   { name: "vaguedadesRule", file: "./rules/vaguedades/rule.js" },
   { name: "rodeosRule", file: "./rules/rodeos/rule.js" },

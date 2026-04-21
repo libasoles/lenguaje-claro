@@ -7,6 +7,7 @@ export interface Match {
   fin: number;
   textoOriginal: string;
   sugerencias: string[];
+  aplicable?: boolean;
   regla: string;
   descripcion: string;
 }
@@ -28,6 +29,14 @@ export interface Pattern {
 export interface VaguedadPattern {
   original: string;
   precision: string;
+}
+
+export interface TituloHonorificoPattern {
+  original: string;
+  sugerencias?: string[];
+  advertencia?: string;
+  regex?: string;
+  aplicable?: boolean;
 }
 
 export interface NlpTermJson {

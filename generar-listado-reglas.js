@@ -89,7 +89,8 @@ function patternToExample(pattern) {
       pattern.sugerencias ||
         pattern.sugerencia ||
         pattern.precision ||
-        pattern.alternativas,
+        pattern.alternativas ||
+        pattern.advertencia,
     ),
   };
 }
