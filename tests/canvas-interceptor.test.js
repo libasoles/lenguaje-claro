@@ -287,6 +287,46 @@ test("no reemplaza fragments si cambia la transformación aunque x e y coincidan
   assert.deepEqual(fragmentTexts, ["primero", "segundo"]);
 });
 
+test("descarta fragments previos cuando hay scroll antes del siguiente render", async () => {
+  const { CanvasRenderingContext2D, document, setNow } =
+    loadCanvasInterceptors();
+
+  const canvas = {
+    width: 800,
+    height: 400,
+    isConnected: true,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 800, height: 400 };
+    },
+  };
+
+  const ctx = new CanvasRenderingContext2D();
+  ctx.canvas = canvas;
+
+  const request = () =>
+    new Promise((resolve) => {
+      const handler = (event) => {
+        document.removeEventListener("docs-reviewer-fragments-data", handler);
+        resolve(extraerRespuestaFragmentos(event.detail));
+      };
+      document.addEventListener("docs-reviewer-fragments-data", handler);
+      document.dispatchEvent({ type: "docs-reviewer-request-fragments" });
+    });
+
+  setNow(0);
+  ctx.fillText("texto anterior", 100, 100);
+
+  document.dispatchEvent({ type: "docs-reviewer-viewport-scrolled" });
+  setNow(100);
+  ctx.fillText("texto nuevo", 320, 220);
+  const snapshot = await request();
+
+  assert.equal(snapshot.source, "live");
+  assert.equal(snapshot.canvasResults.length, 1);
+  assert.equal(snapshot.canvasResults[0].fragments.length, 1);
+  assert.equal(snapshot.canvasResults[0].fragments[0].text, "texto nuevo");
+});
+
 test("emite un evento cuando termina una rafaga de render en canvas", () => {
   const { CanvasRenderingContext2D, document, setNow } =
     loadCanvasInterceptors();
@@ -366,6 +406,47 @@ test("omite snapshot fallback cuando el request lo deshabilita", async () => {
   assert.equal(withFallback.canvasResults.length, 1);
 });
 
+test("invalida snapshot fallback cuando cambia el viewport por scroll", async () => {
+  const { CanvasRenderingContext2D, document, setNow } =
+    loadCanvasInterceptors();
+
+  const canvas = {
+    width: 800,
+    height: 400,
+    isConnected: true,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 800, height: 400 };
+    },
+  };
+
+  const ctx = new CanvasRenderingContext2D();
+  ctx.canvas = canvas;
+
+  const request = () =>
+    new Promise((resolve) => {
+      const handler = (event) => {
+        document.removeEventListener("docs-reviewer-fragments-data", handler);
+        resolve(extraerRespuestaFragmentos(event.detail));
+      };
+      document.addEventListener("docs-reviewer-fragments-data", handler);
+      document.dispatchEvent({ type: "docs-reviewer-request-fragments" });
+    });
+
+  setNow(0);
+  ctx.fillText("Texto visible", 100, 100);
+  setNow(40);
+  canvas.isConnected = false;
+
+  const beforeScroll = await request();
+  document.dispatchEvent({ type: "docs-reviewer-viewport-scrolled" });
+  const afterScroll = await request();
+
+  assert.equal(beforeScroll.source, "snapshot");
+  assert.equal(beforeScroll.canvasResults.length, 1);
+  assert.equal(afterScroll.source, "empty");
+  assert.equal(afterScroll.canvasResults.length, 0);
+});
+
 test("incluye la posicion del tile parent en el payload de fragments", async () => {
   const { CanvasRenderingContext2D, document, setNow } =
     loadCanvasInterceptors();
@@ -410,6 +491,53 @@ test("incluye la posicion del tile parent en el payload de fragments", async () 
   assert.equal(snapshot.canvasResults[0].tilePosition.topPx, 120);
   assert.equal(snapshot.canvasResults[0].tilePosition.leftPx, 36);
   assert.equal(snapshot.canvasResults[0].tilePosition.viewportRect.top, 120);
+});
+
+test("descarta fragments si el tile parent se recicla con transform distinto", async () => {
+  const { CanvasRenderingContext2D, document, setNow } =
+    loadCanvasInterceptors();
+
+  const parentElement = {
+    style: {
+      top: "120px",
+      left: "36px",
+      transform: "translateY(0px)",
+    },
+    getBoundingClientRect() {
+      return { left: 36, top: 120, width: 800, height: 400 };
+    },
+  };
+  const canvas = {
+    width: 800,
+    height: 400,
+    isConnected: true,
+    parentElement,
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 800, height: 400 };
+    },
+  };
+
+  const ctx = new CanvasRenderingContext2D();
+  ctx.canvas = canvas;
+
+  const request = () =>
+    new Promise((resolve) => {
+      const handler = (event) => {
+        document.removeEventListener("docs-reviewer-fragments-data", handler);
+        resolve(extraerRespuestaFragmentos(event.detail));
+      };
+      document.addEventListener("docs-reviewer-fragments-data", handler);
+      document.dispatchEvent({ type: "docs-reviewer-request-fragments" });
+    });
+
+  setNow(0);
+  ctx.fillText("Texto viejo", 100, 100);
+  parentElement.style.transform = "translateY(400px)";
+
+  const snapshot = await request();
+
+  assert.equal(snapshot.source, "empty");
+  assert.equal(snapshot.canvasResults.length, 0);
 });
 
 test("invalida snapshot sin borrar fragments live cuando el documento cambia", async () => {

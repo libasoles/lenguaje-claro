@@ -7,6 +7,7 @@ import { highlighterSharedMethods } from "./highlighter-modules/shared.js";
 const REANALYZE_DEBOUNCE_MS = 400;
 const OVERLAY_HOST_SELECTOR = ".kix-appview-editor-container";
 const ISSUE_SCROLL_TOP_MARGIN_PX = 50;
+const RECENT_SCROLL_RENDER_WINDOW_MS = 1200;
 
 /**
  * DocsHighlighter administra el overlay visual y la interacción de los resaltados en Google Docs.
@@ -77,6 +78,10 @@ export const DocsHighlighter = {
   _iframeEditDoc: null,
   /** Referencia al documento del iframe para Ctrl+Z/Undo */
   _iframeUndoDoc: null,
+  /** Listener global para repintar cuando termina una ráfaga de canvas */
+  _onCanvasRendered: null,
+  /** Timestamp del último scroll del viewport de edición */
+  _lastViewportScrollAt: 0,
 
   inicializar() {
     if (this.overlayElement && this.popupElement) return;
@@ -107,6 +112,7 @@ export const DocsHighlighter = {
     window.addEventListener("resize", () => this.programarRecalculo("resize"));
     const handleScroll = (event) => {
       if (event.target?.closest?.("#docs-reviewer-panel")) return;
+      this.registrarScrollViewportCanvas();
       this.programarRecalculo("scroll");
     };
     window.addEventListener("scroll", handleScroll, true);
@@ -121,6 +127,15 @@ export const DocsHighlighter = {
       "keydown",
       (event) => this.manejarTeclaDocumento(event),
       true,
+    );
+    this._onCanvasRendered = () => {
+      if (this.issues?.length) {
+        this.programarRecalculo("canvas-rendered");
+      }
+    };
+    document.addEventListener(
+      "docs-reviewer-canvas-rendered",
+      this._onCanvasRendered,
     );
 
     this.observarUndoEnIframe();
@@ -213,7 +228,9 @@ export const DocsHighlighter = {
       this.renderizarMarcadores(new Map());
     }
 
-    this.programarRecalculo();
+    this.programarRecalculo(
+      preservarEstadoVisible ? "general" : "initial-load",
+    );
   },
 
   limpiar(options = {}) {
@@ -295,6 +312,30 @@ export const DocsHighlighter = {
     this._lastRenderedCanvasData = canvasResults;
     this._lastRenderedCanvasAt = Date.now();
     return true;
+  },
+
+  registrarScrollViewportCanvas() {
+    this._lastViewportScrollAt = Date.now();
+    if (
+      typeof document === "undefined" ||
+      typeof document.dispatchEvent !== "function"
+    ) {
+      return;
+    }
+
+    let event;
+    if (typeof CustomEvent === "function") {
+      event = new CustomEvent("docs-reviewer-viewport-scrolled");
+    } else if (typeof Event === "function") {
+      event = new Event("docs-reviewer-viewport-scrolled");
+    } else {
+      event = { type: "docs-reviewer-viewport-scrolled" };
+    }
+    document.dispatchEvent(event);
+  },
+
+  huboScrollViewportReciente(windowMs = RECENT_SCROLL_RENDER_WINDOW_MS) {
+    return Date.now() - (this._lastViewportScrollAt || 0) <= windowMs;
   },
 
   capturarIssuesVisiblesPrevios() {
@@ -404,8 +445,18 @@ export const DocsHighlighter = {
     }
 
     const generation = ++this._recalcGeneration;
+    const isInitialLoadRecalc = reason === "initial-load";
+    if (isInitialLoadRecalc) {
+      await this.esperarRenderCanvasEstable(700, 80);
+      if (generation !== this._recalcGeneration) return;
+    }
+
+    const isCanvasRenderedAfterScroll =
+      reason === "canvas-rendered" && this.huboScrollViewportReciente();
     const isViewportChangingRecalc =
-      reason === "scroll" || reason === "focus-scroll";
+      reason === "scroll" ||
+      reason === "focus-scroll" ||
+      isCanvasRenderedAfterScroll;
     const allowSnapshotFallback = !isViewportChangingRecalc;
     const requestTimeout =
       reason === "scroll" ? 120 : reason === "focus-scroll" ? 1000 : 800;
@@ -419,6 +470,7 @@ export const DocsHighlighter = {
     if (!canvasData.length) {
       const cacheAgeMs = Date.now() - (this._lastRenderedCanvasAt || 0);
       if (
+        !isInitialLoadRecalc &&
         !isViewportChangingRecalc &&
         !this._awaitingFreshCanvasAfterEdit &&
         this._lastRenderedCanvasData?.length &&
@@ -470,7 +522,8 @@ export const DocsHighlighter = {
       general: 1,
       resize: 2,
       "focus-scroll": 3,
-      "canvas-rendered": 4,
+      "initial-load": 4,
+      "canvas-rendered": 5,
     };
     if (!currentReason) return nextReason;
     return (priorities[nextReason] ?? 0) >= (priorities[currentReason] ?? 0)
@@ -999,6 +1052,41 @@ export const DocsHighlighter = {
     const targetScrollTop = fraction * Math.max(0, scrollHeight - clientHeight);
 
     this.desplazarContenedorA(container, isWindowContainer, targetScrollTop);
+  },
+
+  esperarRenderCanvasEstable(timeoutMs = 700, settleMs = 80) {
+    return new Promise((resolve) => {
+      if (
+        typeof document === "undefined" ||
+        typeof document.addEventListener !== "function"
+      ) {
+        resolve();
+        return;
+      }
+
+      let timeoutTimer = null;
+      let settleTimer = null;
+      let done = false;
+
+      const clearTimer = (timerId) => {
+        if (timerId !== null) window.clearTimeout(timerId);
+      };
+      const finish = () => {
+        if (done) return;
+        done = true;
+        document.removeEventListener("docs-reviewer-canvas-rendered", onRender);
+        clearTimer(timeoutTimer);
+        clearTimer(settleTimer);
+        resolve();
+      };
+      const onRender = () => {
+        clearTimer(settleTimer);
+        settleTimer = window.setTimeout(finish, settleMs);
+      };
+
+      document.addEventListener("docs-reviewer-canvas-rendered", onRender);
+      timeoutTimer = window.setTimeout(finish, timeoutMs);
+    });
   },
 
   esperarCanvasRendered(timeoutMs = 400, options = {}) {

@@ -416,14 +416,24 @@ export const highlighterSharedMethods = {
   normalizarRectangulos(rects) {
     const normalized = rects
       .filter((rect) => rect.width > 2 && rect.height > 2)
-      .map((rect) => ({
-        left: rect.left,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      }));
+      .map((rect) => {
+        const normalizedRect = {
+          left: rect.left,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        };
+
+        ["baselineY", "underlineTop"].forEach((key) => {
+          if (Number.isFinite(rect[key])) {
+            normalizedRect[key] = rect[key];
+          }
+        });
+
+        return normalizedRect;
+      });
 
     const deduped = [];
     normalized.forEach((rect) => {

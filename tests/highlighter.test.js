@@ -9,6 +9,9 @@ function loadHighlighter(options = {}) {
   const measureContext = {
     font: "16px sans-serif",
     measureText(text) {
+      if (typeof options.measureText === "function") {
+        return options.measureText(text);
+      }
       const width = String(text || "").length;
       return {
         width,
@@ -326,6 +329,23 @@ test("aplicarResaltados limpia el estado y agenda un recálculo por defecto", as
   assert.deepEqual(calls, ["init", "render:0", "schedule"]);
 });
 
+test("aplicarResaltados usa un recálculo inicial estabilizado", async () => {
+  const highlighter = loadHighlighter();
+  let scheduledReason = null;
+
+  highlighter.inicializar = () => {};
+  highlighter.renderizarMarcadores = (issueRects) => {
+    highlighter.currentRects = issueRects;
+  };
+  highlighter.programarRecalculo = (reason) => {
+    scheduledReason = reason;
+  };
+
+  await highlighter.aplicarResaltados([{ id: "arcaismos-0" }]);
+
+  assert.equal(scheduledReason, "initial-load");
+});
+
 test("aplicarResaltados preserva markers visibles durante reanálisis en segundo plano", async () => {
   const highlighter = loadHighlighter();
   const calls = [];
@@ -470,6 +490,21 @@ test("guardarDatosCanvasRenderizado no termina la espera post-edición", () => {
   assert.equal(highlighter._awaitingFreshCanvasAfterEdit, true);
 });
 
+test("registrarScrollViewportCanvas avisa al interceptor e invalida scroll reciente", () => {
+  const dispatched = [];
+  const highlighter = loadHighlighter({
+    dispatchEvent(event) {
+      dispatched.push(event.type);
+      return true;
+    },
+  });
+
+  highlighter.registrarScrollViewportCanvas();
+
+  assert.equal(dispatched.includes("docs-reviewer-viewport-scrolled"), true);
+  assert.equal(highlighter.huboScrollViewportReciente(), true);
+});
+
 test("recalcularPosiciones conserva markers mientras espera canvas fresco tras editar", async () => {
   const highlighter = loadHighlighter();
   let rendered = false;
@@ -490,6 +525,58 @@ test("recalcularPosiciones conserva markers mientras espera canvas fresco tras e
 
   assert.equal(rendered, false);
   assert.equal(highlighter.currentRects.size, 1);
+});
+
+test("recalcularPosiciones no usa snapshot ni cache tras canvas-rendered de scroll", async () => {
+  const highlighter = loadHighlighter();
+  let requestOptions = null;
+  let renderedRects = null;
+
+  highlighter.overlayElement = {};
+  highlighter.issues = [{ id: "issue-previo" }];
+  highlighter._lastViewportScrollAt = Date.now();
+  highlighter._lastRenderedCanvasData = [{ fragments: [{ text: "stale" }] }];
+  highlighter._lastRenderedCanvasAt = Date.now();
+  highlighter.solicitarFragmentosCanvas = async (options = {}) => {
+    requestOptions = options;
+    return {
+      canvasResults: [],
+      source: "empty",
+    };
+  };
+  highlighter.renderizarMarcadores = (issueRects) => {
+    renderedRects = issueRects;
+  };
+
+  await highlighter.recalcularPosiciones("canvas-rendered");
+
+  assert.equal(requestOptions.allowSnapshotFallback, false);
+  assert.equal(renderedRects.size, 0);
+});
+
+test("recalcularPosiciones espera render estable en carga inicial", async () => {
+  const highlighter = loadHighlighter();
+  const calls = [];
+
+  highlighter.overlayElement = {};
+  highlighter.issues = [{ id: "arcaismos-0" }];
+  highlighter.esperarRenderCanvasEstable = async () => {
+    calls.push("wait-render");
+  };
+  highlighter.solicitarFragmentosCanvas = async () => {
+    calls.push("request-fragments");
+    return {
+      canvasResults: [],
+      source: "empty",
+    };
+  };
+  highlighter.renderizarMarcadores = () => {
+    calls.push("render");
+  };
+
+  await highlighter.recalcularPosiciones("initial-load");
+
+  assert.deepEqual(calls, ["wait-render", "request-fragments", "render"]);
 });
 
 test("recalcularPosiciones preserva rects previos faltantes durante repaint parcial", async () => {
@@ -821,6 +908,78 @@ test("renderizarMarcadores ancla los markers a una banda fija bajo cada renglón
   assert.equal(markers[0].style.height, "6px");
   assert.equal(markers[1].style.top, "92px");
   assert.equal(markers[1].style.height, "6px");
+});
+
+test("renderizarMarcadores usa el ancla de subrayado si el rect la trae", () => {
+  const overlayChildren = [];
+  const highlighter = loadHighlighter({
+    querySelector(selector) {
+      if (selector !== ".kix-appview-editor") return null;
+      return {
+        getBoundingClientRect() {
+          return {
+            top: 40,
+          };
+        },
+      };
+    },
+  });
+
+  highlighter.establecerAccionesReviewer({
+    obtenerIssue(issueId) {
+      return {
+        id: issueId,
+        regla: "rodeos",
+      };
+    },
+  });
+  highlighter.overlayElement = {
+    style: {},
+    appendChild(node) {
+      overlayChildren.push(node);
+      node.parentNode = this;
+      return node;
+    },
+  };
+  highlighter.obtenerRectHostOverlay = () => ({ left: 0, top: 0 });
+  highlighter.convertirViewportAHost = (left, top) => ({ left, top });
+  highlighter.sincronizarIssuesConRectangulos = () => {};
+  highlighter.reposicionarDestelloFoco = () => {};
+  highlighter.actualizarClasesMarcadores = () => {};
+  highlighter.ocultarPopup = () => {};
+  highlighter.issueMarkers = new Map();
+
+  highlighter.renderizarMarcadores(
+    new Map([
+      [
+        "rodeos-0",
+        [
+          {
+            left: 10,
+            top: 50,
+            bottom: 62,
+            width: 40,
+            height: 12,
+            underlineTop: 65,
+          },
+          {
+            left: 80,
+            top: 50,
+            bottom: 68,
+            width: 40,
+            height: 18,
+            underlineTop: 65,
+          },
+        ],
+      ],
+    ]),
+  );
+
+  const markers = highlighter.issueMarkers.get("rodeos-0");
+  assert.equal(markers.length, 2);
+  assert.equal(overlayChildren.length, 2);
+  assert.equal(markers[0].style.top, "65px");
+  assert.equal(markers[1].style.top, "65px");
 });
 
 test("obtenerIssueHoverEnCoordenadas detecta hover sobre la palabra y cerca del subrayado", () => {
@@ -1468,6 +1627,55 @@ test("calcularRectanguloPorcionFragmento respeta textBaseline top y no desplaza 
 
   assert.equal(rect.top, 200);
   assert.ok(rect.bottom > rect.top);
+});
+
+test("calcularRectanguloPorcionFragmento ancla el subrayado a la baseline", () => {
+  const highlighter = loadHighlighter({
+    measureText(text) {
+      const value = String(text || "");
+      return {
+        width: value.length,
+        actualBoundingBoxAscent: 10,
+        actualBoundingBoxDescent: value.includes("p") ? 5 : 1,
+      };
+    },
+  });
+  const commonFragment = {
+    font: "16px sans-serif",
+    textAlign: "left",
+    textBaseline: "alphabetic",
+    viewportBaselineX: 100,
+    viewportBaselineY: 200,
+    viewportScaleX: 1,
+    viewportScaleY: 1,
+  };
+
+  const rectSinDescendente = highlighter.calcularRectanguloPorcionFragmento(
+    {
+      ...commonFragment,
+      text: "son",
+    },
+    0,
+    3,
+  );
+  const rectConDescendente = highlighter.calcularRectanguloPorcionFragmento(
+    {
+      ...commonFragment,
+      text: "prestatario",
+    },
+    0,
+    11,
+  );
+
+  assert.notEqual(rectSinDescendente.bottom, rectConDescendente.bottom);
+  assert.equal(rectSinDescendente.baselineY, 200);
+  assert.equal(rectConDescendente.baselineY, 200);
+  assert.equal(rectSinDescendente.underlineTop, rectConDescendente.underlineTop);
+
+  const [normalized] = highlighter.normalizarRectangulos([
+    rectSinDescendente,
+  ]);
+  assert.equal(normalized.underlineTop, rectSinDescendente.underlineTop);
 });
 
 test("calcularRectangulosDesdeIndicesCanvas devuelve un rect por cada línea al cruzar un wrap", () => {

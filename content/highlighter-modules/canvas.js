@@ -337,6 +337,32 @@ export const highlighterCanvasMethods = {
     }
   },
 
+  obtenerBaselineViewportFragmento(frag) {
+    const lineHeight = Math.max(this.estimarAlturaLineaFragmento(frag), 1);
+    const estimatedAscent = lineHeight * 0.8;
+    const estimatedDescent = lineHeight * 0.2;
+    const anchorY = frag?.viewportBaselineY || 0;
+
+    switch (frag?.textBaseline) {
+      case "top":
+      case "hanging":
+        return anchorY + estimatedAscent;
+      case "middle":
+        return anchorY + (estimatedAscent - estimatedDescent) / 2;
+      case "bottom":
+      case "ideographic":
+        return anchorY - estimatedDescent;
+      case "alphabetic":
+      default:
+        return anchorY;
+    }
+  },
+
+  obtenerOffsetSubrayadoDesdeBaseline(frag) {
+    const lineHeight = Math.max(this.estimarAlturaLineaFragmento(frag), 1);
+    return Math.max(2, Math.min(5, lineHeight * 0.12));
+  },
+
   obtenerFuenteNormalizada() {
     const sourceText = obtenerAccionesReviewer().sourceText;
     if (!sourceText) {
@@ -1223,6 +1249,9 @@ export const highlighterCanvasMethods = {
     );
     const top = verticalBounds.top;
     const bottom = verticalBounds.bottom;
+    const baselineY = this.obtenerBaselineViewportFragmento(frag);
+    const underlineTop =
+      baselineY + this.obtenerOffsetSubrayadoDesdeBaseline(frag);
 
     if (right - left < 1 || bottom - top < 1) return null;
     return {
@@ -1232,6 +1261,8 @@ export const highlighterCanvasMethods = {
       bottom,
       width: right - left,
       height: bottom - top,
+      baselineY,
+      underlineTop,
     };
   },
 };

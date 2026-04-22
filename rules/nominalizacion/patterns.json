@@ -105,5 +105,9 @@
   {
     "original": "hágasele saber",
     "sugerencias": ["infórmesele", "avísele", "notifíquese"]
+  },
+  {
+    "original": "vengo por la presente",
+    "sugerencias": ["vengo", "me presento"]
   }
 ]

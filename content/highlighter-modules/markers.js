@@ -7,6 +7,12 @@ const HOVER_HITBOX_BOTTOM_PADDING_PX = 8;
 const HOVER_POPUP_DELAY_MS = 200;
 
 export const highlighterMarkerMethods = {
+  obtenerTopMarcador(rect) {
+    if (Number.isFinite(rect?.underlineTop)) return rect.underlineTop;
+    if (Number.isFinite(rect?.baselineY)) return rect.baselineY + 2;
+    return rect?.bottom || 0;
+  },
+
   renderizarMarcadores(issueRects) {
     this.currentRects = issueRects;
     this.sincronizarIssuesConRectangulos(issueRects);
@@ -31,7 +37,7 @@ export const highlighterMarkerMethods = {
 
       const markers = rects
         .map((rect) => {
-          const markerTop = rect.bottom;
+          const markerTop = this.obtenerTopMarcador(rect);
           const markerHeight = MARKER_BAND_HEIGHT_PX;
           if (markerTop + markerHeight <= editorTop) return null;
 

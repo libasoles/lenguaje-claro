@@ -22,6 +22,7 @@
   // Map from canvas element → { fragments, lastWriteAt }
   const canvasStates = new Map();
   let renderNotificationTimer = null;
+  let viewportScrollGeneration = 0;
 
   // Snapshot of the last completed render burst with viewport-resolved positions.
   // Populated before dispatching 'canvas-rendered' so it's available even when the
@@ -47,6 +48,7 @@
         fragments: [],
         lastWriteAt: -Infinity,
         parentPosAtLastWrite: null,
+        viewportScrollGenerationAtLastWrite: viewportScrollGeneration,
       };
       canvasStates.set(canvas, state);
     }
@@ -57,6 +59,7 @@
     state.fragments = [];
     state.lastWriteAt = -Infinity;
     state.parentPosAtLastWrite = null;
+    state.viewportScrollGenerationAtLastWrite = viewportScrollGeneration;
   }
 
   function invalidateCanvasCache(event) {
@@ -72,6 +75,15 @@
     canvasStates.forEach(function (state) {
       resetCanvasState(state);
     });
+  }
+
+  function handleViewportScrolled() {
+    viewportScrollGeneration += 1;
+    lastRenderedSnapshot = null;
+    if (renderNotificationTimer) {
+      clearTimeout(renderNotificationTimer);
+      renderNotificationTimer = null;
+    }
   }
 
   function serializeMatrix(ctx) {
@@ -142,6 +154,16 @@
     return position;
   }
 
+  function getParentPositionSignature(parent) {
+    if (!parent) return null;
+
+    return {
+      top: parent.style?.top || "",
+      left: parent.style?.left || "",
+      transform: parent.style?.transform || "",
+    };
+  }
+
   function buildCanvasResult(canvas, state) {
     if (!state.fragments.length || !canvas.isConnected) return null;
     const rect = canvas.getBoundingClientRect();
@@ -153,10 +175,13 @@
     // producen markers fantasma.
     const parent = canvas.parentElement;
     const writePos = state.parentPosAtLastWrite;
+    const currentPos = getParentPositionSignature(parent);
     if (
       writePos &&
-      parent &&
-      (writePos.top !== parent.style.top || writePos.left !== parent.style.left)
+      currentPos &&
+      (writePos.top !== currentPos.top ||
+        writePos.left !== currentPos.left ||
+        writePos.transform !== currentPos.transform)
     ) {
       return null;
     }
@@ -256,14 +281,17 @@
       // Google Docs frequently redraws the same canvas after edits/reflow
       // without a full clearRect. Treat temporally separated fillText bursts
       // as a fresh snapshot so old positions do not linger indefinitely.
-      if (now - state.lastWriteAt > RENDER_BURST_GAP_MS) {
+      if (
+        state.viewportScrollGenerationAtLastWrite !==
+          viewportScrollGeneration ||
+        now - state.lastWriteAt > RENDER_BURST_GAP_MS
+      ) {
         resetCanvasState(state);
       }
       state.lastWriteAt = now;
+      state.viewportScrollGenerationAtLastWrite = viewportScrollGeneration;
       const parent = canvas.parentElement;
-      state.parentPosAtLastWrite = parent
-        ? { top: parent.style.top, left: parent.style.left }
-        : null;
+      state.parentPosAtLastWrite = getParentPositionSignature(parent);
       const matrix = serializeMatrix(this);
       const fragment = {
         text,
@@ -294,6 +322,10 @@
   document.addEventListener(
     "docs-reviewer-invalidate-canvas-cache",
     invalidateCanvasCache,
+  );
+  document.addEventListener(
+    "docs-reviewer-viewport-scrolled",
+    handleViewportScrolled,
   );
 
   // Respond to content script fragment requests with serialized, viewport-resolved data.
